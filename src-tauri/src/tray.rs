@@ -1,0 +1,51 @@
+use tauri::{
+    menu::MenuBuilder,
+    tray::TrayIconBuilder,
+    Emitter, Manager,
+};
+
+pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let menu = MenuBuilder::new(app)
+        .text("open_manager", "打开管理面板")
+        .text("new_note", "新建便笺")
+        .text("refresh", "立即刷新")
+        .separator()
+        .text("quit", "退出")
+        .build()?;
+
+    let mut builder = TrayIconBuilder::new()
+        .menu(&menu)
+        .tooltip("GitLab 便笺监控")
+        .on_menu_event(move |app, event| {
+            match event.id.as_ref() {
+                "open_manager" => {
+                    if let Some(window) = app.get_webview_window("manager") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                }
+                "new_note" => {
+                    if let Some(window) = app.get_webview_window("manager") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                        let _ = window.emit("navigate", "new-note");
+                    }
+                }
+                "refresh" => {
+                    let _ = app.emit("force-refresh", ());
+                }
+                "quit" => {
+                    app.exit(0);
+                }
+                _ => {}
+            }
+        });
+
+    if let Some(icon) = app.default_window_icon().cloned() {
+        builder = builder.icon(icon);
+    }
+
+    builder.build(app)?;
+
+    Ok(())
+}
