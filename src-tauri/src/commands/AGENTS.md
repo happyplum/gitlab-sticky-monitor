@@ -8,22 +8,22 @@ Tauri IPC command handlers exposing backend GitLab queries, settings persistence
 ## WHERE TO LOOK
 | File | Role | Key Symbols |
 |------|------|-------------|
-| `mod.rs` | Shared state & poller startup | `get_client()`, `get_config()`, `init_polling()` |
+| `mod.rs` | Shared state & poller startup | `get_clients()`, `get_config()`, `init_polling()`, `reload_clients()` |
 | `gitlab.rs` | GitLab query/mutation commands | `test_connection`, `get_issues`, `get_merge_requests`, `add_comment` |
 | `notes.rs` | Window creation, geometry, persistence | `create_note`, `remove_note`, `update_note_position`, `restore_note_window` |
-| `settings.rs` | Configuration and watched repos | `get_settings`, `save_settings`, `add_watched_repo`, `SettingsResponse` |
+| `settings.rs` | Multi-source & watched repos | `get_sources`, `save_source`, `delete_source`, `test_source_connection` |
 
 ## IPC COMMANDS INVENTORY
-- **GitLab (7)**: `test_connection`, `get_current_user`, `get_projects`, `get_issues`, `get_merge_requests`, `get_todos`, `add_comment`.
+- **GitLab (7)**: `test_connection`, `get_current_user`, `get_projects`, `get_issues`, `get_merge_requests`, `get_todos`, `add_comment` (with `source_id`).
 - **Notes (7)**: `create_note`, `remove_note`, `update_note_position`, `update_note_size`, `update_note_config`, `get_note_config`, `get_all_notes`.
-- **Settings (5)**: `get_settings`, `save_settings`, `get_watched_repos`, `add_watched_repo`, `remove_watched_repo`.
+- **Settings & Sources (9)**: `get_settings`, `save_settings`, `get_sources`, `save_source`, `delete_source`, `test_source_connection`, `get_watched_repos`, `add_watched_repo`, `remove_watched_repo`.
 
 ## CONVENTIONS
 - Commands use `#[tauri::command] pub async fn ... -> Result<T, String>` for serialization across Tauri IPC.
-- Shared state uses `OnceLock<Arc<RwLock<...>>>` for lazy singleton access without passing state through every handler.
+- Shared state uses `OnceLock<Arc<RwLock<HashMap<String, GitLabClient>>>>` for multi-source client pool.
 - Note windows are dynamically created via `WebviewWindowBuilder` with transparent, frameless, and always-on-top attributes using label `note-<UUID-prefix>`.
 - Initial note dimensions default to 340×450 at position (100, 100); compact mode shrinks height to 38px.
-- Internal helper functions (`restore_note_window`, `get_client`, `get_config`, `init_polling`) remain unexposed in `generate_handler!`.
+- Internal helper functions (`restore_note_window`, `get_clients`, `get_config`, `init_polling`) remain unexposed in `generate_handler!`.
 
 ## ANTI-PATTERNS
 - Do NOT perform long blocking operations while holding write locks on `Arc<RwLock<AppConfig>>`.

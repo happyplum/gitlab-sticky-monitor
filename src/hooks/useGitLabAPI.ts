@@ -7,66 +7,95 @@ import type {
   Todo,
   WatchedRepo,
   SettingsResponse,
+  GitLabSource,
   NoteConfig,
 } from "../types/gitlab";
 
 export function useGitLabAPI() {
-  const testConnection = async (baseUrl: string, token: string) => {
-    return invoke<GitLabUser>("test_connection", {
+  const getSources = async () => {
+    return invoke<GitLabSource[]>("get_sources");
+  };
+
+  const saveSource = async (source: GitLabSource) => {
+    return invoke<GitLabSource>("save_source", { source });
+  };
+
+  const deleteSource = async (sourceId: string) => {
+    return invoke<void>("delete_source", { sourceId });
+  };
+
+  const testSourceConnection = async (baseUrl: string, token: string) => {
+    return invoke<GitLabUser>("test_source_connection", {
       baseUrl,
       token,
     });
   };
 
-  const getCurrentUser = async () => {
-    return invoke<GitLabUser>("get_current_user");
+  const testConnection = async (baseUrl: string, token: string) => {
+    return testSourceConnection(baseUrl, token);
   };
 
-  const searchProjects = async (query: string) => {
-    return invoke<Project[]>("get_projects", { query });
+  const getCurrentUser = async (sourceId?: string) => {
+    return invoke<GitLabUser>("get_current_user", { sourceId: sourceId ?? null });
+  };
+
+  const searchProjects = async (query: string, sourceId?: string) => {
+    return invoke<Project[]>("get_projects", {
+      query,
+      sourceId: sourceId ?? null,
+    });
   };
 
   const getIssues = async (
     projectId: number,
     state?: string,
     assignee?: string,
-    labels?: string
+    labels?: string,
+    sourceId?: string
   ) => {
     return invoke<Issue[]>("get_issues", {
       projectId,
       state: state ?? null,
       assignee: assignee ?? null,
       labels: labels ?? null,
+      sourceId: sourceId ?? null,
     });
   };
 
   const getMergeRequests = async (
     projectId: number,
     state?: string,
-    reviewer?: string
+    reviewer?: string,
+    sourceId?: string
   ) => {
     return invoke<MergeRequest[]>("get_merge_requests", {
       projectId,
       state: state ?? null,
       reviewer: reviewer ?? null,
+      sourceId: sourceId ?? null,
     });
   };
 
-  const getTodos = async (projectId?: number) => {
-    return invoke<Todo[]>("get_todos", { projectId: projectId ?? null });
+  const getTodos = async (projectId?: number, sourceId?: string) => {
+    return invoke<Todo[]>("get_todos", {
+      projectId: projectId ?? null,
+      sourceId: sourceId ?? null,
+    });
   };
 
   const addComment = async (
     projectId: number,
     targetType: string,
     targetIid: number,
-    body: string
+    body: string,
+    sourceId?: string
   ) => {
     return invoke("add_comment", {
       projectId,
       targetType,
       targetIid,
       body,
+      sourceId: sourceId ?? null,
     });
   };
 
@@ -74,14 +103,8 @@ export function useGitLabAPI() {
     return invoke<SettingsResponse>("get_settings");
   };
 
-  const saveSettings = async (
-    baseUrl: string,
-    token?: string,
-    pollingIntervalSecs?: number
-  ) => {
+  const saveSettings = async (pollingIntervalSecs?: number) => {
     return invoke("save_settings", {
-      baseUrl,
-      token: token ?? null,
       pollingIntervalSecs: pollingIntervalSecs ?? null,
     });
   };
@@ -92,6 +115,7 @@ export function useGitLabAPI() {
 
   const addWatchedRepo = async (repo: WatchedRepo) => {
     return invoke("add_watched_repo", {
+      sourceId: repo.source_id,
       projectId: repo.project_id,
       name: repo.name,
       path: repo.path,
@@ -99,8 +123,8 @@ export function useGitLabAPI() {
     });
   };
 
-  const removeWatchedRepo = async (projectId: number) => {
-    return invoke("remove_watched_repo", { projectId });
+  const removeWatchedRepo = async (sourceId: string, projectId: number) => {
+    return invoke("remove_watched_repo", { sourceId, projectId });
   };
 
   const getNoteConfig = async (noteId: string) => {
@@ -124,6 +148,10 @@ export function useGitLabAPI() {
   };
 
   return {
+    getSources,
+    saveSource,
+    deleteSource,
+    testSourceConnection,
     testConnection,
     getCurrentUser,
     searchProjects,

@@ -1,11 +1,11 @@
-use crate::storage::{self, WatchedRepo};
 use crate::gitlab::client::GitLabClient;
-use super::{get_client, get_config};
+use crate::gitlab::types::GitLabUser;
+use crate::storage::{self, GitLabSource, WatchedRepo};
+use super::{get_config, reload_clients};
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct SettingsResponse {
-    pub base_url: String,
-    pub has_token: bool,
+    pub sources: Vec<GitLabSource>,
     pub polling_interval_secs: u64,
 }
 
@@ -13,34 +13,76 @@ pub struct SettingsResponse {
 pub async fn get_settings() -> Result<SettingsResponse, String> {
     let cfg = get_config().read().await;
     Ok(SettingsResponse {
-        base_url: cfg.gitlab.base_url.clone(),
-        has_token: !cfg.gitlab.token.is_empty(),
+        sources: cfg.sources.clone(),
         polling_interval_secs: cfg.polling_interval_secs,
     })
 }
 
 #[tauri::command]
+pub async fn get_sources() -> Result<Vec<GitLabSource>, String> {
+    let cfg = get_config().read().await;
+    Ok(cfg.sources.clone())
+}
+
+#[tauri::command]
+pub async fn save_source(mut source: GitLabSource) -> Result<GitLabSource, String> {
+    if source.base_url.trim().is_empty() {
+        return Err("GitLab URL 不能为空".to_string());
+    }
+    // Normalize base_url (remove trailing slash)
+    source.base_url = source.base_url.trim().trim_end_matches('/').to_string();
+
+    if source.id.is_empty() {
+        source.id = format!("src-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap());
+    }
+
+    if source.name.trim().is_empty() {
+        source.name = source.base_url.clone();
+    }
+
+    {
+        let mut cfg = get_config().write().await;
+        if let Some(existing) = cfg.sources.iter_mut().find(|s| s.id == source.id) {
+            *existing = source.clone();
+        } else {
+            cfg.sources.push(source.clone());
+        }
+        storage::save_config(&cfg)?;
+    }
+
+    reload_clients().await;
+    Ok(source)
+}
+
+#[tauri::command]
+pub async fn delete_source(source_id: String) -> Result<(), String> {
+    {
+        let mut cfg = get_config().write().await;
+        cfg.sources.retain(|s| s.id != source_id);
+        // Also remove watched repos under this deleted source
+        cfg.watched_repos.retain(|r| r.source_id != source_id);
+        storage::save_config(&cfg)?;
+    }
+
+    reload_clients().await;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn test_source_connection(base_url: String, token: String) -> Result<GitLabUser, String> {
+    let client = GitLabClient::new(&base_url, &token);
+    client.test_connection().await
+}
+
+#[tauri::command]
 pub async fn save_settings(
-    base_url: String,
-    token: Option<String>,
     polling_interval_secs: Option<u64>,
 ) -> Result<(), String> {
     let mut cfg = get_config().write().await;
-    cfg.gitlab.base_url = base_url.clone();
-    if let Some(t) = token.as_ref() {
-        cfg.gitlab.token = t.clone();
-    }
     if let Some(p) = polling_interval_secs {
         cfg.polling_interval_secs = p;
     }
     storage::save_config(&cfg)?;
-
-    // Update the client
-    if let Some(t) = token {
-        let mut c = get_client().write().await;
-        *c = Some(GitLabClient::new(&base_url, &t));
-    }
-
     Ok(())
 }
 
@@ -52,17 +94,24 @@ pub async fn get_watched_repos() -> Result<Vec<WatchedRepo>, String> {
 
 #[tauri::command]
 pub async fn add_watched_repo(
+    source_id: String,
     project_id: u64,
     name: String,
     path: String,
     web_url: String,
 ) -> Result<(), String> {
     let mut cfg = get_config().write().await;
-    // avoid duplicates
-    if cfg.watched_repos.iter().any(|r| r.project_id == project_id) {
-        return Err("Repository already watched".to_string());
+    // Check composite key (source_id, project_id) to avoid duplicates
+    if cfg
+        .watched_repos
+        .iter()
+        .any(|r| r.source_id == source_id && r.project_id == project_id)
+    {
+        return Err("该源下的该仓库已被监听".to_string());
     }
+
     cfg.watched_repos.push(WatchedRepo {
+        source_id,
         project_id,
         name,
         path,
@@ -72,8 +121,10 @@ pub async fn add_watched_repo(
 }
 
 #[tauri::command]
-pub async fn remove_watched_repo(project_id: u64) -> Result<(), String> {
+pub async fn remove_watched_repo(source_id: String, project_id: u64) -> Result<(), String> {
     let mut cfg = get_config().write().await;
-    cfg.watched_repos.retain(|r| r.project_id != project_id);
+    cfg.watched_repos
+        .retain(|r| !(r.source_id == source_id && r.project_id == project_id));
     storage::save_config(&cfg)
 }
+

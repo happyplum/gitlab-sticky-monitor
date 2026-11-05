@@ -75,7 +75,15 @@ export interface Project {
   avatar_url: string | null;
 }
 
+export interface GitLabSource {
+  id: string;
+  name: string;
+  base_url: string;
+  token: string;
+}
+
 export interface WatchedRepo {
+  source_id: string;
   project_id: number;
   name: string;
   path: string;
@@ -84,6 +92,7 @@ export interface WatchedRepo {
 
 export interface NoteConfig {
   id: string;
+  source_id: string;
   repo_id: number;
   repo_name: string;
   color: string;
@@ -99,6 +108,7 @@ export interface NoteConfig {
 }
 
 export interface GitLabUpdate {
+  source_id: string;
   repo_id: string;
   repo_name: string;
   issues: Issue[];
@@ -108,7 +118,7 @@ export interface GitLabUpdate {
 }
 
 export interface SettingsResponse {
-  base_url: string;
-  has_token: boolean;
+  sources: GitLabSource[];
   polling_interval_secs: number;
 }
+

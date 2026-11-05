@@ -42,26 +42,28 @@ gitlab-sticky-monitor/
 | Symbol | Type | Location | Refs | Role |
 |--------|------|----------|------|------|
 | `App` | Component | `src/App.tsx` | 1 | Root router dispatching ManagerWindow vs StickyNote by label/query |
-| `StickyNote` | Component | `src/windows/StickyNote.tsx` | 1 | Desktop sticky note window with reactive GitLab polling updates |
-| `ManagerWindow` | Component | `src/windows/ManagerWindow.tsx` | 1 | Central configuration, repository management, and note launcher |
-| `useGitLabAPI` | Hook | `src/hooks/useGitLabAPI.ts` | 2 | Type-safe frontend adapter for backend Tauri IPC invocations |
-| `GitLabClient` | Struct | `src-tauri/src/gitlab/client.rs` | 2 | REST API v4 HTTP client with private token authentication |
-| `Poller` | Struct | `src-tauri/src/gitlab/poller.rs` | 1 | Tokio background worker polling watched repos and emitting events |
-| `init_polling` | Function | `src-tauri/src/commands/mod.rs` | 1 | Startup orchestrator restoring saved notes and launching poller |
-| `create_note` | Command | `src-tauri/src/commands/notes.rs` | 1 | Spawns transparent, frameless, always-on-top desktop note windows |
+| `StickyNote` | Component | `src/windows/StickyNote.tsx` | 1 | Desktop sticky note window with source-isolated GitLab polling updates |
+| `ManagerWindow` | Component | `src/windows/ManagerWindow.tsx` | 1 | Central multi-source configuration, repository management, and note launcher |
+| `useGitLabAPI` | Hook | `src/hooks/useGitLabAPI.ts` | 2 | Type-safe frontend adapter for backend Tauri IPC invocations with source_id |
+| `GitLabClient` | Struct | `src-tauri/src/gitlab/client.rs` | 2 | REST API v4 HTTP client with private token authentication per source |
+| `Poller` | Struct | `src-tauri/src/gitlab/poller.rs` | 1 | Tokio background worker polling watched repos by source and emitting events |
+| `init_polling` | Function | `src-tauri/src/commands/mod.rs` | 1 | Startup orchestrator restoring saved notes and launching multi-client poller |
+| `create_note` | Command | `src-tauri/src/commands/notes.rs` | 1 | Spawns transparent, frameless, always-on-top desktop note windows bound to source |
 | `setup_tray` | Function | `src-tauri/src/tray.rs` | 1 | System tray icon, context menu, and background residency |
 
 ## CONVENTIONS
 - Single bundle, multi-window: All windows load `index.html` + `src/main.tsx`; `App.tsx` dispatches UI by window label (`manager` vs `note-*`) or URL search params.
+- Multi-source architecture: Configurations support multiple `GitLabSource` entities. Watched repos and notes use composite keys `(source_id, project_id)` for strict isolation.
 - IPC error convention: Rust commands return `Result<T, String>`; frontend `invoke` returns rejected Promise handled locally in UI.
-- Background residency: The manager window is hidden after tray initialization; the application runs headless in the system tray until invoked.
-- Cross-window communication: Rust poller emits `gitlab-update` and tray emits `force-refresh` / `navigate` via Tauri global events.
+- Background residency: Closing manager window hides it to system tray; the application runs headless in the system tray until invoked.
+- Cross-window communication: Rust poller emits `gitlab-update` with `source_id` + `repo_id`, and tray emits `force-refresh` / `navigate` via Tauri global events.
 
 ## ANTI-PATTERNS (THIS PROJECT)
 - Do NOT remove `#[cfg_attr(not(debug_assertions), windows_subsystem = "windows")]` in `src-tauri/src/main.rs` (causes console window flash in production).
 - Do NOT create separate HTML entry points for new windows; route via `App.tsx` and query parameters.
 - Do NOT mutate note geometry storage during compact mode (prevents overwriting normal dimensions).
 - Do NOT swallow errors during command execution; propagate descriptive string errors to frontend.
+- Do NOT query repositories without specifying `source_id`; cross-source collisions will occur.
 
 ## UNIQUE STYLES
 - Sticky note styling uses pure CSS in `src/styles/sticky-note.css` with CSS custom properties for dynamic note color theming.
@@ -77,5 +79,5 @@ cargo check --manifest-path src-tauri/Cargo.toml # Verify Rust backend compilati
 ```
 
 ## NOTES
-- Default GitLab URL is `https://gitlab.com`, but custom self-hosted GitLab instances are supported via `base_url` setting.
-- Saved configuration lives in OS config directory (`%APPDATA%/gitlab-sticky-monitor/config.json` on Windows).
+- Multiple self-hosted and cloud GitLab instances can be configured in parallel via `sources` settings.
+- Saved configuration lives in OS config directory (`%APPDATA%/gitlab-sticky-monitor/config.json` on Windows) with automatic migration from single-source format.

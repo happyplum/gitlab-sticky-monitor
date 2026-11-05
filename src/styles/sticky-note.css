@@ -52,6 +52,17 @@
   white-space: nowrap;
 }
 
+.note-source-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.12);
+  color: rgba(0, 0, 0, 0.75);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .mini-badges {
   display: flex;
   align-items: center;

@@ -98,6 +98,8 @@ pub struct NoteComment {
 /// Data payload emitted to frontend via Tauri events
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitLabUpdate {
+    #[serde(default)]
+    pub source_id: String,
     pub repo_id: String,
     pub repo_name: String,
     pub issues: Vec<Issue>,

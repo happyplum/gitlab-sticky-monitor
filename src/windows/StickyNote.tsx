@@ -20,6 +20,7 @@ import { formatTimeAgo } from "../utils";
 import "../styles/sticky-note.css";
 
 interface StickyNoteProps {
+  sourceId?: string;
   repoId: string;
   repoName: string;
   noteColor: string;
@@ -27,12 +28,15 @@ interface StickyNoteProps {
 }
 
 export function StickyNote({
+  sourceId,
   repoId,
   repoName,
   noteColor: initialColor,
   noteId,
 }: StickyNoteProps) {
   const api = useGitLabAPI();
+  const [effectiveSourceId, setEffectiveSourceId] = useState<string>(sourceId || "");
+  const [sourceName, setSourceName] = useState<string>("");
   const [currentColor, setCurrentColor] = useState(initialColor);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [mergeRequests, setMergeRequests] = useState<MergeRequest[]>([]);
@@ -59,9 +63,15 @@ export function StickyNote({
 
   isMiniModeRef.current = isMiniMode;
 
+  useEffect(() => {
+    if (sourceId) {
+      setEffectiveSourceId(sourceId);
+    }
+  }, [sourceId]);
+
   // Load user info and note config on mount
   useEffect(() => {
-    api.getCurrentUser()
+    api.getCurrentUser(effectiveSourceId || undefined)
       .then((u) => setCurrentUser(u))
       .catch(() => {});
 
@@ -69,6 +79,9 @@ export function StickyNote({
       .then((cfg) => {
         if (cfg) {
           if (cfg.color) setCurrentColor(cfg.color);
+          if (cfg.source_id && !effectiveSourceId) {
+            setEffectiveSourceId(cfg.source_id);
+          }
           setIsPinned(cfg.always_on_top);
           if (cfg.filters) {
             setFilters({
@@ -83,7 +96,19 @@ export function StickyNote({
       .catch((err) => {
         console.error("Failed to load note config:", err);
       });
-  }, [noteId]);
+  }, [noteId, effectiveSourceId]);
+
+  // Fetch source name
+  useEffect(() => {
+    if (effectiveSourceId) {
+      api.getSources()
+        .then((srcs) => {
+          const found = srcs.find((s) => s.id === effectiveSourceId);
+          if (found) setSourceName(found.name);
+        })
+        .catch(() => {});
+    }
+  }, [effectiveSourceId]);
 
   // Adjust active tab if current tab is hidden by filter
   useEffect(() => {
@@ -100,9 +125,9 @@ export function StickyNote({
     try {
       const projectId = parseInt(repoId);
       const [issueData, mrData, todoData] = await Promise.all([
-        api.getIssues(projectId, "opened"),
-        api.getMergeRequests(projectId, "opened"),
-        api.getTodos(projectId),
+        api.getIssues(projectId, "opened", undefined, undefined, effectiveSourceId || undefined),
+        api.getMergeRequests(projectId, "opened", undefined, effectiveSourceId || undefined),
+        api.getTodos(projectId, effectiveSourceId || undefined),
       ]);
       setIssues(issueData);
       setMergeRequests(mrData);
@@ -113,7 +138,7 @@ export function StickyNote({
     } finally {
       setIsLoading(false);
     }
-  }, [repoId]);
+  }, [repoId, effectiveSourceId]);
 
   useEffect(() => {
     loadData();
@@ -122,7 +147,13 @@ export function StickyNote({
   // Listen for polling updates
   useEffect(() => {
     const unlisten = listen<GitLabUpdate>("gitlab-update", (event) => {
-      if (event.payload.repo_id === repoId) {
+      const matchRepo = event.payload.repo_id === repoId;
+      const matchSource =
+        !effectiveSourceId ||
+        !event.payload.source_id ||
+        event.payload.source_id === effectiveSourceId;
+
+      if (matchRepo && matchSource) {
         setIssues(event.payload.issues);
         setMergeRequests(event.payload.merge_requests);
         setTodos(event.payload.my_todos);
@@ -132,7 +163,7 @@ export function StickyNote({
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [repoId]);
+  }, [repoId, effectiveSourceId]);
 
   // Listen for force refresh
   useEffect(() => {
@@ -300,6 +331,15 @@ export function StickyNote({
       {/* Title Bar */}
       <div className="note-header" data-tauri-drag-region>
         <div className="note-title-wrap" data-tauri-drag-region>
+          {sourceName && (
+            <span
+              className="note-source-tag"
+              data-tauri-drag-region
+              title={`所属 GitLab 源: ${sourceName}`}
+            >
+              {sourceName}
+            </span>
+          )}
           <span className="note-title" data-tauri-drag-region title={repoName}>
             🦊 {repoName}
           </span>

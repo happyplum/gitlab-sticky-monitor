@@ -5,13 +5,23 @@ use super::get_config;
 #[tauri::command]
 pub async fn create_note(
     app: AppHandle,
+    source_id: Option<String>,
     repo_id: u64,
     repo_name: String,
     color: String,
 ) -> Result<String, String> {
+    let resolved_source_id = {
+        let cfg = get_config().read().await;
+        source_id
+            .filter(|s| !s.is_empty())
+            .or_else(|| cfg.sources.first().map(|s| s.id.clone()))
+            .unwrap_or_else(|| "default".to_string())
+    };
+
     let note_id = format!("note-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap());
     let url = format!(
-        "index.html?window=note&repo={}&name={}&color={}&noteId={}",
+        "index.html?window=note&sourceId={}&repo={}&name={}&color={}&noteId={}",
+        urlencoding_simple(&resolved_source_id),
         repo_id,
         urlencoding_simple(&repo_name),
         urlencoding_simple(&color),
@@ -36,6 +46,7 @@ pub async fn create_note(
     // Save note config
     let note_config = NoteConfig {
         id: note_id.clone(),
+        source_id: resolved_source_id,
         repo_id,
         repo_name,
         color,
@@ -56,7 +67,8 @@ pub async fn create_note(
 
 pub fn restore_note_window(app: &AppHandle, note: &NoteConfig) -> Result<(), String> {
     let url = format!(
-        "index.html?window=note&repo={}&name={}&color={}&noteId={}",
+        "index.html?window=note&sourceId={}&repo={}&name={}&color={}&noteId={}",
+        urlencoding_simple(&note.source_id),
         note.repo_id,
         urlencoding_simple(&note.repo_name),
         urlencoding_simple(&note.color),

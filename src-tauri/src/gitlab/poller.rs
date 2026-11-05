@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use chrono::Utc;
@@ -11,17 +12,17 @@ use crate::storage::{AppConfig, WatchedRepo};
 
 pub struct Poller {
     app: AppHandle,
-    client: Arc<RwLock<Option<GitLabClient>>>,
+    clients: Arc<RwLock<HashMap<String, GitLabClient>>>,
     config: Arc<RwLock<AppConfig>>,
 }
 
 impl Poller {
     pub fn new(
         app: AppHandle,
-        client: Arc<RwLock<Option<GitLabClient>>>,
+        clients: Arc<RwLock<HashMap<String, GitLabClient>>>,
         config: Arc<RwLock<AppConfig>>,
     ) -> Self {
-        Self { app, client, config }
+        Self { app, clients, config }
     }
 
     pub async fn start(&self) {
@@ -38,21 +39,31 @@ impl Poller {
     }
 
     pub async fn poll_all(&self) {
-        let client_guard = self.client.read().await;
-        let client = match client_guard.as_ref() {
-            Some(c) => c,
-            None => {
-                log::debug!("No GitLab client configured, skipping poll");
-                return;
-            }
+        let (repos, clients_map) = {
+            let cfg = self.config.read().await;
+            let cls = self.clients.read().await;
+            (cfg.watched_repos.clone(), cls.clone())
         };
 
-        let repos: Vec<WatchedRepo> = {
-            let cfg = self.config.read().await;
-            cfg.watched_repos.clone()
-        };
+        if clients_map.is_empty() {
+            log::debug!("No GitLab clients configured, skipping poll");
+            return;
+        }
 
         for repo in &repos {
+            // Find client for repo's source_id
+            let client = match clients_map.get(&repo.source_id) {
+                Some(c) => c,
+                None => {
+                    log::debug!(
+                        "No GitLab client configured for source_id '{}' (repo {}), skipping",
+                        repo.source_id,
+                        repo.name
+                    );
+                    continue;
+                }
+            };
+
             let issues = client
                 .get_issues(repo.project_id, Some("opened"), None, None)
                 .await
@@ -69,6 +80,7 @@ impl Poller {
                 .unwrap_or_default();
 
             let update = GitLabUpdate {
+                source_id: repo.source_id.clone(),
                 repo_id: repo.project_id.to_string(),
                 repo_name: repo.name.clone(),
                 issues,
@@ -78,7 +90,8 @@ impl Poller {
             };
 
             let _ = self.app.emit("gitlab-update", &update);
-            log::debug!("Emitted update for repo {}", repo.name);
+            log::debug!("Emitted update for repo {} [source {}]", repo.name, repo.source_id);
         }
     }
 }
+
