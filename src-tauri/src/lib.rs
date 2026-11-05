@@ -3,8 +3,6 @@ mod gitlab;
 mod storage;
 mod tray;
 
-use tauri::Manager;
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::init();
@@ -25,12 +23,16 @@ pub fn run() {
                 }
             });
 
-            // Hide manager window initially (start in tray)
-            if let Some(window) = app.get_webview_window("manager") {
-                let _ = window.hide();
-            }
-
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "manager" {
+                    // Minimize to tray instead of destroying window
+                    let _ = window.hide();
+                    api.prevent_close();
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::gitlab::test_connection,

@@ -1,6 +1,6 @@
 use tauri::{
     menu::MenuBuilder,
-    tray::TrayIconBuilder,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager,
 };
 
@@ -15,7 +15,22 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     let mut builder = TrayIconBuilder::new()
         .menu(&menu)
+        .show_menu_on_left_click(false)
         .tooltip("GitLab 便笺监控")
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                let app = tray.app_handle();
+                if let Some(window) = app.get_webview_window("manager") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+        })
         .on_menu_event(move |app, event| {
             match event.id.as_ref() {
                 "open_manager" => {
@@ -49,3 +64,4 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
