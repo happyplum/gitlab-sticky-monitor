@@ -1,0 +1,30 @@
+async page => {
+  await page.goto('http://localhost:1420/tests/noteLifecycle.html');
+  const until=async(fn,message)=>{for(let i=0;i<60;i++){if(await fn())return;await page.waitForTimeout(50);}throw Error(message);};
+  const editor=page.getByRole('textbox',{name:'便笺内容'});
+  await editor.waitFor();
+  await page.evaluate(()=>{window.__race.hold='save_note_document';});
+  await editor.click();await page.keyboard.insertText('退出交叉');
+  await until(()=>page.evaluate(()=>window.__race.held>0),'save not delayed');
+  await page.getByRole('button',{name:'收起便笺',exact:true}).click();
+  await page.evaluate(()=>window.__race.emit('prepare-exit','close-overlap'));
+  await page.evaluate(()=>window.__race.release());
+  await until(()=>page.evaluate(()=>!window.__race.note.is_open && window.__race.acks.length>0),'close/ack not complete');
+  await page.waitForTimeout(100);
+  const closeResult=await editor.getAttribute('contenteditable')==='false';
+  await page.evaluate(()=>window.__race.emit('exit-cancelled','测试取消'));
+  await until(async()=>await editor.getAttribute('contenteditable')==='true','cancel did not restore editing');
+  await page.evaluate(()=>{const s=window.__race;s.hold='plugin:window|scale_factor';s.held=0;s.acks=[];return s.emit('tauri://resize',{width:360,height:470});});
+  await until(()=>page.evaluate(()=>window.__race.held>0),'resize not delayed');
+  await page.evaluate(()=>window.__race.emit('prepare-exit','resize-overlap'));
+  await page.waitForTimeout(100);
+  const early=await page.evaluate(()=>window.__race.acks.length>0);
+  await page.evaluate(()=>window.__race.release());
+  await until(()=>page.evaluate(()=>window.__race.acks.length>0),'ack missing');
+  const size=await page.evaluate(()=>window.__race.note.size);
+  await page.evaluate(()=>window.__race.emit('exit-cancelled','测试取消'));
+  const results=[{name:'close does not unfreeze pending exit',passed:closeResult},{name:'exit awaits delayed resize',passed:!early&&size.w===360&&size.h===470}];
+  const result={passed:results.every(r=>r.passed),results};
+  await page.evaluate(result=>{window.__raceResult=result;console.log('EXIT_RACES_DONE',JSON.stringify(result));},result);
+  return result;
+}

@@ -33,7 +33,8 @@ gitlab-sticky-monitor/
 |------|----------|-------|
 | Add new Tauri command | `src-tauri/src/commands/` | Implement command in submodule, re-export in `commands/mod.rs`, register in `lib.rs` |
 | Wrap IPC in frontend | `src/hooks/useGitLabAPI.ts` | Add typed `invoke<T>` wrapper and expose through hook |
-| Adjust sticky note UI | `src/windows/StickyNote.tsx` | Multi-tab view (issues/MRs/todos), filters, compact mode |
+| Adjust sticky note UI | `src/windows/StickyNote.tsx` | Single-feed GitLab notes and custom rich text, native focus, save and hide lifecycle |
+| Edit custom content | `src/components/RichTextEditor.tsx` | Lexical JSON, four text formats, paragraph indentation; no GitLab or IPC logic |
 | Modify manager dashboard | `src/windows/ManagerWindow.tsx` | Settings, repo search, note instance manager |
 | Update GitLab polling | `src-tauri/src/gitlab/poller.rs` | Background tokio loop emitting `gitlab-update` |
 | Change persistence schema | `src-tauri/src/storage.rs` | Update `AppConfig` and sync with `src/types/gitlab.ts` |
@@ -61,15 +62,23 @@ gitlab-sticky-monitor/
 ## ANTI-PATTERNS (THIS PROJECT)
 - Do NOT remove `#[cfg_attr(not(debug_assertions), windows_subsystem = "windows")]` in `src-tauri/src/main.rs` (causes console window flash in production).
 - Do NOT create separate HTML entry points for new windows; route via `App.tsx` and query parameters.
-- Do NOT mutate note geometry storage during compact mode (prevents overwriting normal dimensions).
+- Do NOT change window dimensions on focus/blur. Store positions as physical pixels and sizes as logical pixels, converting at the native boundary.
 - Do NOT swallow errors during command execution; propagate descriptive string errors to frontend.
 - Do NOT query repositories without specifying `source_id`; cross-source collisions will occur.
 
 ## UNIQUE STYLES
 - The manager and notes use a light theme with a muted green accent. Shared colors, controls, focus states, and status badges are maintained in `src/styles/global.css`; use the shared `Icon` for line icons.
 - The manager keeps the three existing sections (sources, repositories, notes) in a sidebar; aggregated work and notification features are not implemented by this UI refresh.
-- Sticky note styling lives in `src/styles/sticky-note.css`. The saved color is passed through `--note-color` for the top border and a lightly tinted background; existing palette and persisted values stay unchanged.
-- Compact mode shrinks the sticky note window to 38px title-bar strip showing badge counts.
+- Sticky note styling lives in `src/styles/sticky-note.css`; the saved `--note-color` fills the note. Unfocused notes show content with a quiet drag region; native focus reveals controls and GitLab repository/source/data-update time.
+- Custom notes keep save status in the formatting toolbar. Mouse editing uses the caret without an enclosing focus ring; keyboard focus remains visible.
+
+## NOTE DATA AND LIFECYCLE
+- `NoteConfig` shares ID, color, geometry, pinning and `is_open`. Its `kind` discriminates `gitlab` (one `feed`: issues/mrs/todos, source/repo and filters) from `custom` (Lexical document JSON). No duplicate HTML/plain-text content is stored.
+- URL identity is only `noteId`; load the canonical config through IPC. GitLab requests/events match both source and repository. Custom notes never fetch GitLab data.
+- Rust config is the saved authority. `update_config` writes a candidate under the existing config write lock, replaces the file atomically, then publishes memory. Failed reads/writes preserve existing content and report errors.
+- `noteSaver.ts` serializes writes and coalesces pending drafts. Hide and normal exit wait for the latest draft/geometry save. Errors retain the draft and leave the application running. Force termination or power loss cannot guarantee unsaved edits.
+- Close hides and persists `is_open=false`; reopening keeps the same note ID. Only explicit confirmed deletion removes content. Startup restores only open notes. `lifecycle.rs` coordinates normal exit acknowledgements before the process ends.
+- Config version 2 is canonical. Unversioned single/multi-source configurations migrate once at load: each old note becomes enabled Issues/MR feeds plus Todos, preserving source, appearance, geometry and filters. New IDs are assigned to extra notes. Legacy source fallback exists only in this read-boundary migration; versioned invalid data never falls back to legacy interpretation.
 
 ## COMMANDS
 ```bash
@@ -78,8 +87,12 @@ npm run build     # Run TypeScript check (tsc) and Vite build to dist/
 npm run tauri dev # Launch Tauri desktop app with Vite dev server
 npm run tauri build # Package production desktop installers (NSIS/MSI)
 cargo check --manifest-path src-tauri/Cargo.toml # Verify Rust backend compilation
+node --test tests/noteSaver.test.mjs # Serial/coalesced draft saves
+cargo test --manifest-path src-tauri/Cargo.toml --lib storage::tests # Storage and migration
 ```
+
+`tests/noteLifecycle.html` mounts the actual note UI with controlled mock IPC for close/exit/resize races. With `npm run dev` running, use an isolated Playwright CLI session to open `http://localhost:1420/tests/noteLifecycle.html`, then run `tests/noteLifecycle.browser.js` and inspect `window.__raceResult.passed`. This checks component ordering, not native OS exit or real GitLab connectivity.
 
 ## NOTES
 - Multiple self-hosted and cloud GitLab instances can be configured in parallel via `sources` settings.
-- Saved configuration lives in OS config directory (`%APPDATA%/gitlab-sticky-monitor/config.json` on Windows) with automatic migration from single-source format.
+- Saved configuration lives in OS config directory (`%APPDATA%/gitlab-sticky-monitor/config.json` on Windows). Debug builds accept `GITLAB_STICKY_TEST_CONFIG` for isolated desktop acceptance; production ignores it.

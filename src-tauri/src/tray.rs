@@ -50,7 +50,7 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     let _ = app.emit("force-refresh", ());
                 }
                 "quit" => {
-                    app.exit(0);
+                    crate::lifecycle::request_exit(app.clone());
                 }
                 _ => {}
             }

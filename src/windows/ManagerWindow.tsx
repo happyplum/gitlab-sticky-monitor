@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useGitLabAPI } from "../hooks/useGitLabAPI";
 import { Icon } from "../components/Icon";
 import type {
@@ -7,10 +7,11 @@ import type {
   Project,
   WatchedRepo,
   NoteConfig,
+  NoteFeed,
 } from "../types/gitlab";
 import "../styles/global.css";
 
-import { NOTE_COLORS } from "../constants";
+import { NOTE_COLORS, NOTE_FEEDS } from "../constants";
 
 export function ManagerWindow() {
   const api = useGitLabAPI();
@@ -38,6 +39,9 @@ export function ManagerWindow() {
   // Notes
   const [notes, setNotes] = useState<NoteConfig[]>([]);
   const [selectedColor, setSelectedColor] = useState(NOTE_COLORS[0].value);
+  const [selectedFeed, setSelectedFeed] = useState<NoteFeed>("issues");
+  const [noteBusy, setNoteBusy] = useState(false);
+  const [noteError, setNoteError] = useState("");
 
   const [activeSection, setActiveSection] = useState<
     "settings" | "repos" | "notes"
@@ -48,6 +52,12 @@ export function ManagerWindow() {
     loadSources();
     loadRepos();
     loadNotes();
+    const events = [
+      listen("notes-changed", () => { void loadNotes(); }),
+      listen<string>("navigate", ({ payload }) => { if (payload === "new-note") setActiveSection("notes"); }),
+      listen<string>("exit-cancelled", ({ payload }) => setNoteError(payload)),
+    ];
+    return () => { events.forEach(event => { void event.then(unlisten => unlisten()); }); };
   }, []);
 
   const loadSources = async () => {
@@ -74,10 +84,10 @@ export function ManagerWindow() {
 
   const loadNotes = async () => {
     try {
-      const n = await invoke<NoteConfig[]>("get_all_notes");
+      const n = await api.getAllNotes();
       setNotes(n);
-    } catch {
-      /* no notes yet */
+    } catch (error) {
+      setNoteError(String(error));
     }
   };
 
@@ -201,26 +211,36 @@ export function ManagerWindow() {
   };
 
   const handleCreateNote = async (repo: WatchedRepo) => {
+    setNoteBusy(true);
     try {
-      await invoke("create_note", {
-        sourceId: repo.source_id,
-        repoId: repo.project_id,
-        repoName: repo.name,
-        color: selectedColor,
-      });
+      await api.createNote(repo.source_id, repo.project_id, selectedFeed, selectedColor);
       await loadNotes();
+      setNoteError("");
     } catch (e) {
-      console.error(e);
-    }
+      setNoteError(String(e));
+    } finally { setNoteBusy(false); }
   };
 
   const handleRemoveNote = async (noteId: string) => {
+    if (!confirm("永久删除这张便笺及其内容？此操作无法撤销。")) return;
+    setNoteBusy(true);
     try {
-      await invoke("remove_note", { noteId });
+      await api.removeNote(noteId);
       await loadNotes();
+      setNoteError("");
     } catch (e) {
-      console.error(e);
-    }
+      setNoteError(String(e));
+    } finally { setNoteBusy(false); }
+  };
+
+  const handleOpenNote = async (noteId?: string) => {
+    setNoteBusy(true);
+    try {
+      if (noteId) await api.openNote(noteId); else await api.createCustomNote(selectedColor);
+      setNoteError("");
+      await loadNotes();
+    } catch (error) { setNoteError(String(error)); }
+    finally { setNoteBusy(false); }
   };
 
   const getSourceName = (sourceId: string) => {
@@ -272,6 +292,7 @@ export function ManagerWindow() {
       </aside>
 
       <main className="manager-content">
+        {noteError && <div className="error-msg" role="alert">{noteError}</div>}
         {activeSection === "settings" && (
           <section className="section">
             <div className="section-heading">
@@ -514,6 +535,12 @@ export function ManagerWindow() {
                 )}
 
                 <div className="watched-repos">
+                  <div className="source-selector note-kind-selector">
+                    <label htmlFor="note-feed">新建 GitLab 便笺类型</label>
+                    <select id="note-feed" value={selectedFeed} onChange={event => setSelectedFeed(event.target.value as NoteFeed)}>
+                      {Object.entries(NOTE_FEEDS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                  </div>
                   <h3>
                     已监听的仓库{" "}
                     <span className="section-count">{watchedRepos.length}</span>
@@ -544,6 +571,7 @@ export function ManagerWindow() {
                           <button
                             className="btn btn-small btn-primary"
                             onClick={() => handleCreateNote(repo)}
+                            disabled={noteBusy}
                           >
                             <Icon name="note" /> 创建便笺
                           </button>
@@ -574,6 +602,10 @@ export function ManagerWindow() {
               <p>把常看的项目放在桌面，随时掌握进展。</p>
             </div>
 
+            <button className="btn btn-primary new-custom-note" disabled={noteBusy} onClick={() => void handleOpenNote()}>
+              <Icon name="plus" /> 新建自定义便笺
+            </button>
+
             <div className="color-picker">
               <span className="field-label">新建便笺颜色</span>
               <div className="color-options">
@@ -593,11 +625,11 @@ export function ManagerWindow() {
 
             <div className="notes-list">
               <h3>
-                活动便笺 <span className="section-count">{notes.length}</span>
+                全部便笺 <span className="section-count">{notes.length}</span>
               </h3>
               {notes.length === 0 ? (
                 <div className="empty-state">
-                  还没有创建便笺，请前往「仓库管理」页面为特定仓库创建便笺
+                  新建一张自定义便笺，或前往「仓库管理」创建 Issues、MR、待办便笺
                 </div>
               ) : (
                 notes.map((note) => (
@@ -608,22 +640,25 @@ export function ManagerWindow() {
                   >
                     <div className="note-list-info">
                       <div>
-                        <span className="source-badge">
-                          {getSourceName(note.source_id)}
-                        </span>
-                        <strong>{note.repo_name}</strong>
+                        {note.kind === "gitlab" && <span className="source-badge">{getSourceName(note.source_id)}</span>}
+                        <strong>{note.kind === "gitlab" ? `${note.repo_name} · ${NOTE_FEEDS[note.feed]}` : "自定义便笺"}</strong>
                       </div>
                       <small>
-                        {note.filters.show_issues ? "Issues " : ""}
-                        {note.filters.show_mrs ? "MR " : ""}
+                        {note.is_open ? "已打开" : "已收起，内容已保留"}
                       </small>
                     </div>
+                    <div className="action-row">
+                    <button className="btn btn-small" disabled={noteBusy} onClick={() => void handleOpenNote(note.id)}>
+                      {note.is_open ? "显示" : "重新打开"}
+                    </button>
                     <button
                       className="btn btn-small btn-danger"
                       onClick={() => handleRemoveNote(note.id)}
+                      disabled={noteBusy}
                     >
-                      <Icon name="close" /> 关闭
+                      <Icon name="trash" /> 删除
                     </button>
+                    </div>
                   </div>
                 ))
               )}

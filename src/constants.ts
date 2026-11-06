@@ -3,6 +3,8 @@ export interface NoteColorOption {
   value: string;
 }
 
+export const NOTE_FEEDS = { issues: "Issues", mrs: "MR", todos: "待办" } as const;
+
 export const NOTE_COLORS: NoteColorOption[] = [
   { name: "柠檬黄", value: "#FFFACD" },
   { name: "薄荷绿", value: "#E0F5E0" },

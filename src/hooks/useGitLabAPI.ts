@@ -9,6 +9,7 @@ import type {
   SettingsResponse,
   GitLabSource,
   NoteConfig,
+  NoteFeed,
 } from "../types/gitlab";
 
 export function useGitLabAPI() {
@@ -139,8 +140,6 @@ export function useGitLabAPI() {
     noteId: string;
     color?: string;
     alwaysOnTop?: boolean;
-    showIssues?: boolean;
-    showMrs?: boolean;
     onlyAssignedToMe?: boolean;
     labels?: string[];
   }) => {
@@ -148,6 +147,15 @@ export function useGitLabAPI() {
   };
 
   return {
+    createNote: (sourceId: string, repoId: number, feed: NoteFeed, color: string) =>
+      invoke<string>("create_note", { sourceId, repoId, feed, color }),
+    createCustomNote: (color: string) => invoke<string>("create_custom_note", { color }),
+    openNote: (noteId: string) => invoke<void>("open_note", { noteId }),
+    hideNote: (noteId: string) => invoke<void>("hide_note", { noteId }),
+    removeNote: (noteId: string) => invoke<void>("remove_note", { noteId }),
+    getAllNotes: () => invoke<NoteConfig[]>("get_all_notes"),
+    saveNoteDocument: (noteId: string, document: import("lexical").SerializedEditorState) =>
+      invoke<void>("save_note_document", { noteId, document }),
     getSources,
     saveSource,
     deleteSource,

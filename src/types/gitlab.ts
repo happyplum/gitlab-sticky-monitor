@@ -90,22 +90,33 @@ export interface WatchedRepo {
   web_url: string;
 }
 
-export interface NoteConfig {
-  id: string;
+export type NoteFeed = "issues" | "mrs" | "todos";
+
+export interface NoteFilters {
+  only_assigned_to_me: boolean;
+  labels: string[];
+}
+
+export type NoteContent = {
+  kind: "gitlab";
   source_id: string;
   repo_id: number;
   repo_name: string;
+  feed: NoteFeed;
+  filters: NoteFilters;
+} | {
+  kind: "custom";
+  document: import("lexical").SerializedEditorState;
+};
+
+export type NoteConfig = NoteContent & {
+  id: string;
   color: string;
   position: { x: number; y: number };
   size: { w: number; h: number };
   always_on_top: boolean;
-  filters: {
-    show_issues: boolean;
-    show_mrs: boolean;
-    only_assigned_to_me: boolean;
-    labels: string[];
-  };
-}
+  is_open: boolean;
+};
 
 export interface GitLabUpdate {
   source_id: string;

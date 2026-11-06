@@ -10,9 +10,13 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@lexical/history": "0.53.0",
+    "@lexical/react": "0.53.0",
+    "@lexical/rich-text": "0.53.0",
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-notification": "^2.8.0",
     "@tauri-apps/plugin-shell": "^2.6.0",
+    "lexical": "0.53.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "zustand": "^5.0.16"

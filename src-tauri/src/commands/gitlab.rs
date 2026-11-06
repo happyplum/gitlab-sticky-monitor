@@ -4,11 +4,7 @@ use crate::gitlab::types::*;
 async fn resolve_client(source_id: Option<&str>) -> Result<GitLabClient, String> {
     let clients = super::get_clients().read().await;
     if let Some(id) = source_id {
-        if !id.is_empty() {
-            if let Some(client) = clients.get(id) {
-                return Ok(client.clone());
-            }
-        }
+        return clients.get(id).cloned().ok_or_else(|| "该便笺的 GitLab 源未配置有效凭据".to_string());
     }
     // Fallback to the first available client
     if let Some((_, client)) = clients.iter().next() {

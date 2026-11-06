@@ -42,12 +42,12 @@ pub async fn save_source(mut source: GitLabSource) -> Result<GitLabSource, Strin
 
     {
         let mut cfg = get_config().write().await;
-        if let Some(existing) = cfg.sources.iter_mut().find(|s| s.id == source.id) {
-            *existing = source.clone();
-        } else {
-            cfg.sources.push(source.clone());
-        }
-        storage::save_config(&cfg)?;
+        storage::update_config(&mut cfg, |cfg| {
+            if let Some(existing) = cfg.sources.iter_mut().find(|s| s.id == source.id) {
+                *existing = source.clone();
+            } else { cfg.sources.push(source.clone()); }
+            Ok(())
+        })?;
     }
 
     reload_clients().await;
@@ -58,10 +58,11 @@ pub async fn save_source(mut source: GitLabSource) -> Result<GitLabSource, Strin
 pub async fn delete_source(source_id: String) -> Result<(), String> {
     {
         let mut cfg = get_config().write().await;
-        cfg.sources.retain(|s| s.id != source_id);
-        // Also remove watched repos under this deleted source
-        cfg.watched_repos.retain(|r| r.source_id != source_id);
-        storage::save_config(&cfg)?;
+        storage::update_config(&mut cfg, |cfg| {
+            cfg.sources.retain(|s| s.id != source_id);
+            cfg.watched_repos.retain(|r| r.source_id != source_id);
+            Ok(())
+        })?;
     }
 
     reload_clients().await;
@@ -79,11 +80,10 @@ pub async fn save_settings(
     polling_interval_secs: Option<u64>,
 ) -> Result<(), String> {
     let mut cfg = get_config().write().await;
-    if let Some(p) = polling_interval_secs {
-        cfg.polling_interval_secs = p;
-    }
-    storage::save_config(&cfg)?;
-    Ok(())
+    storage::update_config(&mut cfg, |cfg| {
+        if let Some(p) = polling_interval_secs { cfg.polling_interval_secs = p; }
+        Ok(())
+    })
 }
 
 #[tauri::command]
@@ -110,21 +110,18 @@ pub async fn add_watched_repo(
         return Err("该源下的该仓库已被监听".to_string());
     }
 
-    cfg.watched_repos.push(WatchedRepo {
-        source_id,
-        project_id,
-        name,
-        path,
-        web_url,
-    });
-    storage::save_config(&cfg)
+    storage::update_config(&mut cfg, |cfg| {
+        cfg.watched_repos.push(WatchedRepo { source_id, project_id, name, path, web_url });
+        Ok(())
+    })
 }
 
 #[tauri::command]
 pub async fn remove_watched_repo(source_id: String, project_id: u64) -> Result<(), String> {
     let mut cfg = get_config().write().await;
-    cfg.watched_repos
-        .retain(|r| !(r.source_id == source_id && r.project_id == project_id));
-    storage::save_config(&cfg)
+    storage::update_config(&mut cfg, |cfg| {
+        cfg.watched_repos.retain(|r| !(r.source_id == source_id && r.project_id == project_id));
+        Ok(())
+    })
 }
 

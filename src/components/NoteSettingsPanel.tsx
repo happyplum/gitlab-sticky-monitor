@@ -1,19 +1,13 @@
 import { useState, type KeyboardEvent } from "react";
 import { NOTE_COLORS } from "../constants";
 import { Icon } from "./Icon";
-
-export interface NoteFilterState {
-  show_issues: boolean;
-  show_mrs: boolean;
-  only_assigned_to_me: boolean;
-  labels: string[];
-}
+import type { NoteFilters } from "../types/gitlab";
 
 interface NoteSettingsPanelProps {
   currentColor: string;
-  filters: NoteFilterState;
+  filters?: NoteFilters;
   onChangeColor: (color: string) => void;
-  onChangeFilters: (filters: NoteFilterState) => void;
+  onChangeFilters: (filters: NoteFilters) => void;
   onClose: () => void;
 }
 
@@ -27,31 +21,15 @@ export function NoteSettingsPanel({
   const [labelInput, setLabelInput] = useState("");
 
   const handleToggleAssigned = () => {
+    if (!filters) return;
     onChangeFilters({
       ...filters,
       only_assigned_to_me: !filters.only_assigned_to_me,
     });
   };
 
-  const handleToggleIssues = () => {
-    // Keep at least one content tab active
-    if (filters.show_issues && !filters.show_mrs) return;
-    onChangeFilters({
-      ...filters,
-      show_issues: !filters.show_issues,
-    });
-  };
-
-  const handleToggleMrs = () => {
-    // Keep at least one content tab active
-    if (filters.show_mrs && !filters.show_issues) return;
-    onChangeFilters({
-      ...filters,
-      show_mrs: !filters.show_mrs,
-    });
-  };
-
   const handleAddLabel = () => {
+    if (!filters) return;
     const trimmed = labelInput.trim();
     if (!trimmed) return;
     if (!filters.labels.includes(trimmed)) {
@@ -71,6 +49,7 @@ export function NoteSettingsPanel({
   };
 
   const handleRemoveLabel = (labelToRemove: string) => {
+    if (!filters) return;
     onChangeFilters({
       ...filters,
       labels: filters.labels.filter((l) => l !== labelToRemove),
@@ -117,6 +96,7 @@ export function NoteSettingsPanel({
           </div>
 
           {/* Only assigned to me */}
+          {filters && <>
           <div className="settings-field">
             <span className="settings-label">内容筛选</span>
             <label className="toggle-row">
@@ -127,29 +107,6 @@ export function NoteSettingsPanel({
               />
               <span>只看与我相关（指派/评审）</span>
             </label>
-          </div>
-
-          {/* Module Visibility */}
-          <div className="settings-field">
-            <span className="settings-label">展示模块</span>
-            <div className="checkbox-group">
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={filters.show_issues}
-                  onChange={handleToggleIssues}
-                />
-                <span>显示 Issues</span>
-              </label>
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={filters.show_mrs}
-                  onChange={handleToggleMrs}
-                />
-                <span>显示 Merge Requests</span>
-              </label>
-            </div>
           </div>
 
           {/* Label Filter */}
@@ -197,6 +154,7 @@ export function NoteSettingsPanel({
                 : "未设置标签过滤，显示全部"}
             </small>
           </div>
+          </>}
         </div>
 
         <div className="note-settings-footer">

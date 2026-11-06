@@ -25,7 +25,12 @@ pub async fn get_client_for_source(source_id: &str) -> Option<GitLabClient> {
 }
 
 pub fn get_config() -> &'static Arc<RwLock<storage::AppConfig>> {
-    CONFIG.get_or_init(|| Arc::new(RwLock::new(storage::load_config())))
+    CONFIG.get().expect("configuration is initialized before commands are registered")
+}
+
+pub fn init_config() -> Result<(), String> {
+    CONFIG.set(Arc::new(RwLock::new(storage::load_config()?)))
+        .map_err(|_| "配置已经初始化".to_string())
 }
 
 pub async fn reload_clients() {
@@ -61,7 +66,7 @@ pub async fn init_polling(app: AppHandle) -> Result<(), String> {
         cfg.notes.clone()
     };
     for note in &notes {
-        let _ = notes::restore_note_window(&app, note);
+        if note.is_open { notes::restore_note_window(&app, note)?; }
     }
 
     // Start the poller

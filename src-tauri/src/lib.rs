@@ -2,6 +2,7 @@ mod commands;
 mod gitlab;
 mod storage;
 mod tray;
+mod lifecycle;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -12,6 +13,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
+            commands::init_config().map_err(std::io::Error::other)?;
             // Setup system tray
             tray::setup_tray(app)?;
 
@@ -31,6 +33,10 @@ pub fn run() {
                     // Minimize to tray instead of destroying window
                     let _ = window.hide();
                     api.prevent_close();
+                } else if window.label().starts_with("note-") {
+                    use tauri::Emitter;
+                    api.prevent_close();
+                    let _ = window.emit_to(window.label(), "request-note-close", ());
                 }
             }
         })
@@ -43,6 +49,11 @@ pub fn run() {
             commands::gitlab::get_todos,
             commands::gitlab::add_comment,
             commands::notes::create_note,
+            commands::notes::create_custom_note,
+            commands::notes::open_note,
+            commands::notes::hide_note,
+            commands::notes::save_note_document,
+            lifecycle::acknowledge_exit,
             commands::notes::remove_note,
             commands::notes::update_note_position,
             commands::notes::update_note_size,
@@ -59,6 +70,14 @@ pub fn run() {
             commands::settings::add_watched_repo,
             commands::settings::remove_watched_repo,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                if !lifecycle::exit_allowed() {
+                    api.prevent_exit();
+                    lifecycle::request_exit(app.clone());
+                }
+            }
+        });
 }
