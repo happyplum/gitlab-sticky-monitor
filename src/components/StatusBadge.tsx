@@ -4,24 +4,21 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, count }: StatusBadgeProps) {
-  const statusMap: Record<string, { color: string; label: string }> = {
-    opened: { color: "#22C55E", label: "Open" },
-    closed: { color: "#EF4444", label: "Closed" },
-    merged: { color: "#8B5CF6", label: "Merged" },
-    success: { color: "#10B981", label: "Passed" },
-    failed: { color: "#EF4444", label: "Failed" },
-    running: { color: "#F59E0B", label: "Running" },
-    pending: { color: "#9CA3AF", label: "Pending" },
+  const statusMap: Record<string, string> = {
+    opened: "开放",
+    closed: "关闭",
+    merged: "已合并",
+    success: "CI 通过",
+    failed: "CI 失败",
+    running: "CI 运行中",
+    pending: "CI 等待中",
+    canceled: "CI 已取消",
+    unavailable: "暂无流水线",
   };
 
-  const info = statusMap[status] || { color: "#6B7280", label: status };
-
   return (
-    <span
-      className="status-badge"
-      style={{ backgroundColor: info.color + "20", color: info.color }}
-    >
-      {info.label}
+    <span className="status-badge" data-status={status}>
+      {statusMap[status] || status}
       {count !== undefined && ` (${count})`}
     </span>
   );

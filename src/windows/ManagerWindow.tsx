@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useGitLabAPI } from "../hooks/useGitLabAPI";
+import { Icon } from "../components/Icon";
 import type {
   GitLabSource,
   Project,
@@ -86,9 +87,9 @@ export function ManagerWindow() {
     setSourceTestError("");
     try {
       const user = await api.testSourceConnection(baseUrl, token);
-      setSourceTestMsg(`✅ 连接成功！欢迎, ${user.name} (@${user.username})`);
+      setSourceTestMsg(`连接成功！欢迎，${user.name} (@${user.username})`);
     } catch (e) {
-      setSourceTestError(`❌ 连接失败: ${String(e)}`);
+      setSourceTestError(`连接失败: ${String(e)}`);
     } finally {
       setIsTestingSource(false);
     }
@@ -229,42 +230,61 @@ export function ManagerWindow() {
 
   return (
     <div className="manager">
-      <header className="manager-header">
-        <h1>🦊 GitLab 便笺监控</h1>
-        <span className="user-info">
-          已配置源数: {sources.length} | 监听仓库: {watchedRepos.length}
-        </span>
-      </header>
-
-      <nav className="manager-nav">
-        <button
-          className={activeSection === "settings" ? "active" : ""}
-          onClick={() => setActiveSection("settings")}
-        >
-          ⚙️ 源设置
-        </button>
-        <button
-          className={activeSection === "repos" ? "active" : ""}
-          onClick={() => setActiveSection("repos")}
-        >
-          📂 仓库管理
-        </button>
-        <button
-          className={activeSection === "notes" ? "active" : ""}
-          onClick={() => setActiveSection("notes")}
-        >
-          📝 便笺管理
-        </button>
-      </nav>
+      <aside className="manager-sidebar">
+        <header className="manager-brand">
+          <span className="brand-mark">
+            <Icon name="note" />
+          </span>
+          <div>
+            <h1>GitLab 便笺</h1>
+            <span>你的桌面工作空间</span>
+          </div>
+        </header>
+        <nav className="manager-nav" aria-label="主导航">
+          <button
+            className={activeSection === "settings" ? "active" : ""}
+            aria-current={activeSection === "settings" ? "page" : undefined}
+            onClick={() => setActiveSection("settings")}
+          >
+            <Icon name="settings" /> 源设置
+          </button>
+          <button
+            className={activeSection === "repos" ? "active" : ""}
+            aria-current={activeSection === "repos" ? "page" : undefined}
+            onClick={() => setActiveSection("repos")}
+          >
+            <Icon name="layers" /> 仓库管理
+          </button>
+          <button
+            className={activeSection === "notes" ? "active" : ""}
+            aria-current={activeSection === "notes" ? "page" : undefined}
+            onClick={() => setActiveSection("notes")}
+          >
+            <Icon name="note" /> 桌面便笺
+          </button>
+        </nav>
+        <div className="manager-summary">
+          <span>{sources.length} 个 GitLab 源</span>
+          <span>
+            {watchedRepos.length} 个监听仓库 · {notes.length} 个便笺
+          </span>
+        </div>
+      </aside>
 
       <main className="manager-content">
         {activeSection === "settings" && (
           <section className="section">
-            <h2>⚙️ GitLab 多源配置</h2>
+            <div className="section-heading">
+              <h2>源设置</h2>
+              <p>连接你的 GitLab，管理访问凭据与同步间隔。</p>
+            </div>
 
             {/* List of existing sources */}
-            <div style={{ marginBottom: "24px" }}>
-              <h3>已配置的 GitLab 源 ({sources.length})</h3>
+            <div className="source-list">
+              <h3>
+                已配置的连接{" "}
+                <span className="section-count">{sources.length}</span>
+              </h3>
               {sources.length === 0 ? (
                 <div className="empty-state">
                   尚未配置任何 GitLab 源，请在下方添加第一个源
@@ -272,16 +292,17 @@ export function ManagerWindow() {
               ) : (
                 sources.map((s) => (
                   <div key={s.id} className="source-card">
+                    <span className="entity-icon">
+                      <Icon name="server" />
+                    </span>
                     <div className="source-card-info">
-                      <strong>🏷️ {s.name}</strong>
-                      <small>🌐 {s.base_url}</small>
-                      <small>
-                        🔑 Token: {s.token ? `${s.token.slice(0, 8)}...` : "(未设置)"}
-                      </small>
+                      <strong>{s.name}</strong>
+                      <small>{s.base_url}</small>
+                      <small>访问令牌：{s.token ? "已设置" : "未设置"}</small>
                     </div>
-                    <div style={{ display: "flex", gap: "8px" }}>
+                    <div className="action-row">
                       <button
-                        className="btn btn-small btn-primary"
+                        className="btn btn-small"
                         onClick={() => handleTestSource(s.base_url, s.token)}
                         disabled={isTestingSource}
                       >
@@ -306,19 +327,12 @@ export function ManagerWindow() {
             </div>
 
             {/* Form to add or edit source */}
-            <div
-              style={{
-                background: "var(--bg-card)",
-                padding: "16px",
-                borderRadius: "var(--radius)",
-                border: "1px solid var(--border)",
-                marginBottom: "24px",
-              }}
-            >
-              <h3>{editingId ? "✏️ 编辑 GitLab 源" : "➕ 添加新 GitLab 源"}</h3>
+            <div className="settings-section">
+              <h3>{editingId ? "编辑 GitLab 源" : "添加 GitLab 源"}</h3>
               <div className="form-group">
-                <label>源名称（如：公司内网 GitLab、个人开源）</label>
+                <label htmlFor="source-name">源名称</label>
                 <input
+                  id="source-name"
                   type="text"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
@@ -326,8 +340,9 @@ export function ManagerWindow() {
                 />
               </div>
               <div className="form-group">
-                <label>GitLab URL</label>
+                <label htmlFor="source-url">GitLab 地址</label>
                 <input
+                  id="source-url"
                   type="text"
                   value={formUrl}
                   onChange={(e) => setFormUrl(e.target.value)}
@@ -335,23 +350,24 @@ export function ManagerWindow() {
                 />
               </div>
               <div className="form-group">
-                <label>Personal Access Token</label>
+                <label htmlFor="source-token">
+                  访问令牌（Personal Access Token）
+                </label>
                 <input
+                  id="source-token"
                   type="password"
                   value={formToken}
                   onChange={(e) => setFormToken(e.target.value)}
                   placeholder="glpat-xxxxxxxxxxxx"
                 />
                 <small>
-                  需要 <code>read_api</code> 权限，如需评论则需要 <code>api</code> 权限
+                  需要 <code>read_api</code> 权限，如需评论则需要{" "}
+                  <code>api</code> 权限
                 </small>
               </div>
 
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleSaveSource}
-                >
+              <div className="action-row">
+                <button className="btn btn-primary" onClick={handleSaveSource}>
                   {editingId ? "保存修改" : "添加源"}
                 </button>
                 <button
@@ -378,26 +394,32 @@ export function ManagerWindow() {
                 )}
               </div>
 
-              {sourceTestMsg && <div className="success-msg">{sourceTestMsg}</div>}
-              {sourceTestError && <div className="error-msg">{sourceTestError}</div>}
+              {sourceTestMsg && (
+                <div className="success-msg" role="status">
+                  <Icon name="check" />
+                  {sourceTestMsg}
+                </div>
+              )}
+              {sourceTestError && (
+                <div className="error-msg" role="alert">
+                  <Icon name="issue" />
+                  {sourceTestError}
+                </div>
+              )}
             </div>
 
             {/* Polling Interval */}
-            <div
-              style={{
-                background: "var(--bg-card)",
-                padding: "16px",
-                borderRadius: "var(--radius)",
-                border: "1px solid var(--border)",
-              }}
-            >
-              <h3>⏱️ 轮询同步配置</h3>
+            <div className="settings-section">
+              <h3>后台同步</h3>
               <div className="form-group">
-                <label>全局后台轮询间隔（秒）</label>
+                <label htmlFor="polling-interval">轮询间隔（秒）</label>
                 <input
+                  id="polling-interval"
                   type="number"
                   value={pollingInterval}
-                  onChange={(e) => setPollingInterval(parseInt(e.target.value) || 60)}
+                  onChange={(e) =>
+                    setPollingInterval(parseInt(e.target.value) || 60)
+                  }
                   min={10}
                   max={3600}
                 />
@@ -411,7 +433,10 @@ export function ManagerWindow() {
 
         {activeSection === "repos" && (
           <section className="section">
-            <h2>📂 监听仓库管理（精准隔离）</h2>
+            <div className="section-heading">
+              <h2>仓库管理</h2>
+              <p>选择要关注的项目，为它们创建桌面便笺。</p>
+            </div>
 
             {sources.length === 0 ? (
               <div className="empty-state">
@@ -420,10 +445,9 @@ export function ManagerWindow() {
             ) : (
               <>
                 <div className="source-selector">
-                  <label>
-                    <strong>当前操作的 GitLab 源：</strong>
-                  </label>
+                  <label htmlFor="repo-source">GitLab 源</label>
                   <select
+                    id="repo-source"
                     value={activeSourceId}
                     onChange={(e) => {
                       setActiveSourceId(e.target.value);
@@ -440,6 +464,7 @@ export function ManagerWindow() {
 
                 <div className="search-bar">
                   <input
+                    aria-label="搜索项目"
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -451,7 +476,8 @@ export function ManagerWindow() {
                     onClick={handleSearch}
                     disabled={isSearching}
                   >
-                    {isSearching ? "搜索中..." : "🔍 搜索项目"}
+                    <Icon name="search" />
+                    {isSearching ? "搜索中..." : "搜索项目"}
                   </button>
                 </div>
 
@@ -462,7 +488,7 @@ export function ManagerWindow() {
                       const isWatched = watchedRepos.some(
                         (r) =>
                           r.source_id === activeSourceId &&
-                          r.project_id === project.id
+                          r.project_id === project.id,
                       );
                       return (
                         <div key={project.id} className="search-result-item">
@@ -478,7 +504,8 @@ export function ManagerWindow() {
                             onClick={() => handleAddRepo(project)}
                             disabled={isWatched}
                           >
-                            {isWatched ? "已监听" : "+ 监听此仓库"}
+                            <Icon name={isWatched ? "check" : "plus"} />
+                            {isWatched ? "已监听" : "监听仓库"}
                           </button>
                         </div>
                       );
@@ -487,7 +514,10 @@ export function ManagerWindow() {
                 )}
 
                 <div className="watched-repos">
-                  <h3>已监听的固定仓库 ({watchedRepos.length})</h3>
+                  <h3>
+                    已监听的仓库{" "}
+                    <span className="section-count">{watchedRepos.length}</span>
+                  </h3>
                   {watchedRepos.length === 0 ? (
                     <div className="empty-state">
                       还没有监听任何仓库，请使用上方搜索框添加
@@ -498,12 +528,15 @@ export function ManagerWindow() {
                         key={`${repo.source_id}-${repo.project_id}`}
                         className="repo-item"
                       >
+                        <span className="entity-icon">
+                          <Icon name="layers" />
+                        </span>
                         <div className="repo-info">
                           <div>
                             <span className="source-badge">
                               {getSourceName(repo.source_id)}
                             </span>
-                            <strong>📦 {repo.name}</strong>
+                            <strong>{repo.name}</strong>
                           </div>
                           <small>{repo.path}</small>
                         </div>
@@ -512,7 +545,7 @@ export function ManagerWindow() {
                             className="btn btn-small btn-primary"
                             onClick={() => handleCreateNote(repo)}
                           >
-                            📝 创建便笺
+                            <Icon name="note" /> 创建便笺
                           </button>
                           <button
                             className="btn btn-small btn-danger"
@@ -520,8 +553,9 @@ export function ManagerWindow() {
                               handleRemoveRepo(repo.source_id, repo.project_id)
                             }
                             title="取消监听该仓库"
+                            aria-label={`取消监听 ${repo.name}`}
                           >
-                            🗑️
+                            <Icon name="trash" />
                           </button>
                         </div>
                       </div>
@@ -535,10 +569,13 @@ export function ManagerWindow() {
 
         {activeSection === "notes" && (
           <section className="section">
-            <h2>📝 便笺管理</h2>
+            <div className="section-heading">
+              <h2>桌面便笺</h2>
+              <p>把常看的项目放在桌面，随时掌握进展。</p>
+            </div>
 
             <div className="color-picker">
-              <label>默认新建便笺颜色：</label>
+              <span className="field-label">新建便笺颜色</span>
               <div className="color-options">
                 {NOTE_COLORS.map((c) => (
                   <button
@@ -547,13 +584,17 @@ export function ManagerWindow() {
                     style={{ backgroundColor: c.value }}
                     onClick={() => setSelectedColor(c.value)}
                     title={c.name}
+                    aria-label={c.name}
+                    aria-pressed={selectedColor === c.value}
                   />
                 ))}
               </div>
             </div>
 
             <div className="notes-list">
-              <h3>活动桌面便笺 ({notes.length})</h3>
+              <h3>
+                活动便笺 <span className="section-count">{notes.length}</span>
+              </h3>
               {notes.length === 0 ? (
                 <div className="empty-state">
                   还没有创建便笺，请前往「仓库管理」页面为特定仓库创建便笺
@@ -565,7 +606,7 @@ export function ManagerWindow() {
                     className="note-list-item"
                     style={{ borderLeftColor: note.color }}
                   >
-                    <div>
+                    <div className="note-list-info">
                       <div>
                         <span className="source-badge">
                           {getSourceName(note.source_id)}
@@ -581,7 +622,7 @@ export function ManagerWindow() {
                       className="btn btn-small btn-danger"
                       onClick={() => handleRemoveNote(note.id)}
                     >
-                      ✕ 关闭
+                      <Icon name="close" /> 关闭
                     </button>
                   </div>
                 ))

@@ -11,7 +11,7 @@ GitLab Sticky Monitor is a desktop sticky note utility for GitLab issues, merge 
 ```
 gitlab-sticky-monitor/
 ├── src/                    # Frontend React application (single-bundle multi-window dispatch)
-│   ├── components/         # Cards (IssueCard, MergeRequestCard), NoteSettingsPanel, StatusBadge
+│   ├── components/         # Cards, NoteSettingsPanel, shared Icon and StatusBadge
 │   ├── hooks/              # useGitLabAPI hook wrapping Tauri invoke calls
 │   ├── windows/            # ManagerWindow (settings & repo manager) & StickyNote (desktop card)
 │   ├── styles/             # global.css (theme variables) & sticky-note.css (note layout)
@@ -66,7 +66,9 @@ gitlab-sticky-monitor/
 - Do NOT query repositories without specifying `source_id`; cross-source collisions will occur.
 
 ## UNIQUE STYLES
-- Sticky note styling uses pure CSS in `src/styles/sticky-note.css` with CSS custom properties for dynamic note color theming.
+- The manager and notes use a light theme with a muted green accent. Shared colors, controls, focus states, and status badges are maintained in `src/styles/global.css`; use the shared `Icon` for line icons.
+- The manager keeps the three existing sections (sources, repositories, notes) in a sidebar; aggregated work and notification features are not implemented by this UI refresh.
+- Sticky note styling lives in `src/styles/sticky-note.css`. The saved color is passed through `--note-color` for the top border and a lightly tinted background; existing palette and persisted values stay unchanged.
 - Compact mode shrinks the sticky note window to 38px title-bar strip showing badge counts.
 
 ## COMMANDS

@@ -1,10 +1,18 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  type CSSProperties,
+} from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { useGitLabAPI } from "../hooks/useGitLabAPI";
 import { IssueCard } from "../components/IssueCard";
 import { MergeRequestCard } from "../components/MergeRequestCard";
+import { Icon } from "../components/Icon";
 import {
   NoteSettingsPanel,
   type NoteFilterState,
@@ -35,7 +43,9 @@ export function StickyNote({
   noteId,
 }: StickyNoteProps) {
   const api = useGitLabAPI();
-  const [effectiveSourceId, setEffectiveSourceId] = useState<string>(sourceId || "");
+  const [effectiveSourceId, setEffectiveSourceId] = useState<string>(
+    sourceId || "",
+  );
   const [sourceName, setSourceName] = useState<string>("");
   const [currentColor, setCurrentColor] = useState(initialColor);
   const [issues, setIssues] = useState<Issue[]>([]);
@@ -55,7 +65,9 @@ export function StickyNote({
     labels: [],
   });
 
-  const [activeTab, setActiveTab] = useState<"issues" | "mrs" | "todos">("issues");
+  const [activeTab, setActiveTab] = useState<"issues" | "mrs" | "todos">(
+    "issues",
+  );
   const appWindow = getCurrentWindow();
   const prevHeightRef = useRef<number>(450);
   const isMiniModeRef = useRef<boolean>(false);
@@ -71,11 +83,13 @@ export function StickyNote({
 
   // Load user info and note config on mount
   useEffect(() => {
-    api.getCurrentUser(effectiveSourceId || undefined)
+    api
+      .getCurrentUser(effectiveSourceId || undefined)
       .then((u) => setCurrentUser(u))
       .catch(() => {});
 
-    api.getNoteConfig(noteId)
+    api
+      .getNoteConfig(noteId)
       .then((cfg) => {
         if (cfg) {
           if (cfg.color) setCurrentColor(cfg.color);
@@ -101,7 +115,8 @@ export function StickyNote({
   // Fetch source name
   useEffect(() => {
     if (effectiveSourceId) {
-      api.getSources()
+      api
+        .getSources()
         .then((srcs) => {
           const found = srcs.find((s) => s.id === effectiveSourceId);
           if (found) setSourceName(found.name);
@@ -125,8 +140,19 @@ export function StickyNote({
     try {
       const projectId = parseInt(repoId);
       const [issueData, mrData, todoData] = await Promise.all([
-        api.getIssues(projectId, "opened", undefined, undefined, effectiveSourceId || undefined),
-        api.getMergeRequests(projectId, "opened", undefined, effectiveSourceId || undefined),
+        api.getIssues(
+          projectId,
+          "opened",
+          undefined,
+          undefined,
+          effectiveSourceId || undefined,
+        ),
+        api.getMergeRequests(
+          projectId,
+          "opened",
+          undefined,
+          effectiveSourceId || undefined,
+        ),
         api.getTodos(projectId, effectiveSourceId || undefined),
       ]);
       setIssues(issueData);
@@ -269,7 +295,7 @@ export function StickyNote({
       if (filters.only_assigned_to_me && currentUser?.username) {
         const myName = currentUser.username.toLowerCase();
         const isAssignee = issue.assignees?.some(
-          (a) => a.username.toLowerCase() === myName
+          (a) => a.username.toLowerCase() === myName,
         );
         const isAuthor = issue.author?.username.toLowerCase() === myName;
         if (!isAssignee && !isAuthor) return false;
@@ -278,8 +304,8 @@ export function StickyNote({
       if (filters.labels.length > 0) {
         const matchesLabel = filters.labels.some((lbl) =>
           issue.labels?.some((il) =>
-            il.toLowerCase().includes(lbl.toLowerCase())
-          )
+            il.toLowerCase().includes(lbl.toLowerCase()),
+          ),
         );
         if (!matchesLabel) return false;
       }
@@ -294,10 +320,10 @@ export function StickyNote({
       if (filters.only_assigned_to_me && currentUser?.username) {
         const myName = currentUser.username.toLowerCase();
         const isAssignee = mr.assignees?.some(
-          (a) => a.username.toLowerCase() === myName
+          (a) => a.username.toLowerCase() === myName,
         );
         const isReviewer = mr.reviewers?.some(
-          (r) => r.username.toLowerCase() === myName
+          (r) => r.username.toLowerCase() === myName,
         );
         const isAuthor = mr.author?.username.toLowerCase() === myName;
         if (!isAssignee && !isReviewer && !isAuthor) return false;
@@ -305,7 +331,7 @@ export function StickyNote({
 
       if (filters.labels.length > 0) {
         const matchesLabel = filters.labels.some((lbl) =>
-          mr.labels?.some((ml) => ml.toLowerCase().includes(lbl.toLowerCase()))
+          mr.labels?.some((ml) => ml.toLowerCase().includes(lbl.toLowerCase())),
         );
         if (!matchesLabel) return false;
       }
@@ -326,11 +352,14 @@ export function StickyNote({
   return (
     <div
       className={`sticky-note ${isMiniMode ? "mini" : ""}`}
-      style={{ backgroundColor: currentColor }}
+      style={{ "--note-color": currentColor } as CSSProperties}
     >
       {/* Title Bar */}
       <div className="note-header" data-tauri-drag-region>
         <div className="note-title-wrap" data-tauri-drag-region>
+          <span className="note-title" data-tauri-drag-region title={repoName}>
+            {repoName}
+          </span>
           {sourceName && (
             <span
               className="note-source-tag"
@@ -340,9 +369,6 @@ export function StickyNote({
               {sourceName}
             </span>
           )}
-          <span className="note-title" data-tauri-drag-region title={repoName}>
-            🦊 {repoName}
-          </span>
           {isMiniMode && (
             <div className="mini-badges" data-tauri-drag-region>
               {filters.show_issues && (
@@ -379,30 +405,37 @@ export function StickyNote({
               className={`note-btn ${showSettings ? "active" : ""}`}
               onClick={() => setShowSettings(!showSettings)}
               title="便笺设置与过滤"
+              aria-label="便笺设置与过滤"
+              aria-expanded={showSettings}
             >
-              ⚙️
+              <Icon name="settings" />
             </button>
           )}
           <button
             className="note-btn"
             onClick={toggleMiniMode}
             title={isMiniMode ? "展开便笺" : "折叠为小条"}
+            aria-label={isMiniMode ? "展开便笺" : "折叠为小条"}
+            aria-expanded={!isMiniMode}
           >
-            {isMiniMode ? "🔽" : "🔼"}
+            <Icon name={isMiniMode ? "down" : "up"} />
           </button>
           <button
             className={`note-btn ${isPinned ? "active" : ""}`}
             onClick={togglePin}
             title={isPinned ? "取消置顶" : "置顶"}
+            aria-label={isPinned ? "取消置顶" : "置顶"}
+            aria-pressed={isPinned}
           >
-            📌
+            <Icon name="pin" />
           </button>
           <button
             className="note-btn close-btn"
             onClick={handleClose}
             title="关闭"
+            aria-label="关闭便笺"
           >
-            ✕
+            <Icon name="close" />
           </button>
         </div>
       </div>
@@ -413,12 +446,12 @@ export function StickyNote({
           {/* Active Filter Indicator */}
           {activeFilterNotice && (
             <div className="filter-active-bar">
-              <span className="filter-active-text">
-                🔍 已过滤: {activeFilterNotice}
+              <Icon name="filter" />
+              <span className="filter-active-text" title={activeFilterNotice}>
+                {activeFilterNotice}
               </span>
               <button
-                className="note-btn"
-                style={{ width: "auto", height: "18px", fontSize: "10px" }}
+                className="note-btn filter-reset"
                 onClick={() =>
                   handleChangeFilters({
                     ...filters,
@@ -438,38 +471,51 @@ export function StickyNote({
             {filters.show_issues && (
               <button
                 className={`tab ${activeTab === "issues" ? "active" : ""}`}
+                aria-pressed={activeTab === "issues"}
                 onClick={() => setActiveTab("issues")}
               >
-                Issues ({filteredIssues.length})
+                Issues{" "}
+                <span className="tab-count">{filteredIssues.length}</span>
               </button>
             )}
             {filters.show_mrs && (
               <button
                 className={`tab ${activeTab === "mrs" ? "active" : ""}`}
+                aria-pressed={activeTab === "mrs"}
                 onClick={() => setActiveTab("mrs")}
               >
-                MR ({filteredMergeRequests.length})
+                MR{" "}
+                <span className="tab-count">
+                  {filteredMergeRequests.length}
+                </span>
               </button>
             )}
             <button
               className={`tab ${activeTab === "todos" ? "active" : ""}`}
+              aria-pressed={activeTab === "todos"}
               onClick={() => setActiveTab("todos")}
             >
-              Todos ({todos.length})
+              待办 <span className="tab-count">{todos.length}</span>
             </button>
           </div>
 
           {/* Content Area */}
           <div className="note-content">
             {isLoading ? (
-              <div className="loading">⏳ 加载中...</div>
+              <div className="loading" role="status">
+                <Icon name="refresh" />
+                加载中...
+              </div>
             ) : activeTab === "issues" ? (
               filteredIssues.length > 0 ? (
                 filteredIssues
                   .slice(0, 15)
                   .map((issue) => <IssueCard key={issue.id} issue={issue} />)
               ) : (
-                <div className="empty">✨ 暂无符合条件的 Issue</div>
+                <div className="empty">
+                  <Icon name="issue" />
+                  暂无符合条件的 Issue
+                </div>
               )
             ) : activeTab === "mrs" ? (
               filteredMergeRequests.length > 0 ? (
@@ -477,37 +523,54 @@ export function StickyNote({
                   .slice(0, 15)
                   .map((mr) => <MergeRequestCard key={mr.id} mr={mr} />)
               ) : (
-                <div className="empty">✨ 暂无符合条件的合并请求</div>
+                <div className="empty">
+                  <Icon name="merge" />
+                  暂无符合条件的合并请求
+                </div>
               )
             ) : todos.length > 0 ? (
               todos.slice(0, 15).map((todo) => (
-                <div
+                <button
+                  type="button"
                   key={todo.id}
                   className="todo-item"
                   onClick={() => window.open(todo.target_url)}
                 >
-                  <span className="todo-action">{todo.action_name}</span>
-                  <span className="todo-body">{todo.body.slice(0, 60)}</span>
+                  <span className="todo-action">
+                    <Icon name="message" />
+                    {todo.action_name}
+                  </span>
+                  <span className="todo-body" title={todo.body}>
+                    {todo.body.slice(0, 60)}
+                  </span>
                   <span className="todo-time">
                     {formatTimeAgo(todo.created_at)}
                   </span>
-                </div>
+                </button>
               ))
             ) : (
-              <div className="empty">✨ 暂无待办事项</div>
+              <div className="empty">
+                <Icon name="check" />
+                暂无待办事项
+              </div>
             )}
           </div>
 
           {/* Footer */}
           <div className="note-footer">
-            <button className="refresh-btn" onClick={loadData} title="刷新">
-              🔄
-            </button>
             <span>
               {lastUpdate
                 ? `更新于 ${new Date(lastUpdate).toLocaleTimeString()}`
                 : ""}
             </span>
+            <button
+              className="refresh-btn"
+              onClick={loadData}
+              title="刷新"
+              aria-label="刷新"
+            >
+              <Icon name="refresh" />
+            </button>
           </div>
 
           {/* In-Note Settings Overlay */}

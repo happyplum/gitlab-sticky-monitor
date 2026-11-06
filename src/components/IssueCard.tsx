@@ -1,23 +1,14 @@
 import type { Issue } from "../types/gitlab";
-import { openUrl } from "../utils";
+import { formatTimeAgo, openUrl } from "../utils";
+import { Icon } from "./Icon";
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
-}
-
-function priorityIcon(labels: string[]): string {
+function priorityTone(labels: string[]): string {
   const lower = labels.map((l) => l.toLowerCase());
   if (lower.some((l) => l.includes("critical") || l.includes("urgent")))
-    return "🔴";
-  if (lower.some((l) => l.includes("high"))) return "🟠";
-  if (lower.some((l) => l.includes("medium"))) return "🟡";
-  return "🔵";
+    return "critical";
+  if (lower.some((l) => l.includes("high"))) return "high";
+  if (lower.some((l) => l.includes("medium"))) return "medium";
+  return "normal";
 }
 
 interface IssueCardProps {
@@ -26,30 +17,43 @@ interface IssueCardProps {
 
 export function IssueCard({ issue }: IssueCardProps) {
   return (
-    <div className="item-card" onClick={() => openUrl(issue.web_url)}>
-      <div className="item-header">
-        <span className="item-icon">{priorityIcon(issue.labels)}</span>
-        <span className="item-id">#{issue.iid}</span>
+    <button
+      type="button"
+      className="item-card"
+      onClick={() => openUrl(issue.web_url)}
+    >
+      <span className="item-header">
+        <span className="item-icon" data-priority={priorityTone(issue.labels)}>
+          <Icon name="issue" />
+        </span>
         <span className="item-title" title={issue.title}>
           {issue.title}
         </span>
-      </div>
-      <div className="item-meta">
-        <span className="item-author">👤 @{issue.author.username}</span>
-        <span className="item-time">{timeAgo(issue.updated_at)}</span>
+      </span>
+      <span className="item-meta">
+        <span className="item-id">#{issue.iid}</span>
+        <span className="item-author">
+          <Icon name="user" /> @{issue.author.username}
+        </span>
+        <span className="item-time">{formatTimeAgo(issue.updated_at)}</span>
         {issue.user_notes_count ? (
-          <span className="item-comments">💬 {issue.user_notes_count}</span>
+          <span
+            className="item-comments"
+            aria-label={`${issue.user_notes_count} 条评论`}
+          >
+            <Icon name="message" /> {issue.user_notes_count}
+          </span>
         ) : null}
-      </div>
+      </span>
       {issue.labels.length > 0 && (
-        <div className="item-labels">
+        <span className="item-labels">
           {issue.labels.slice(0, 3).map((label) => (
             <span key={label} className="label-badge">
               {label}
             </span>
           ))}
-        </div>
+        </span>
       )}
-    </div>
+    </button>
   );
 }

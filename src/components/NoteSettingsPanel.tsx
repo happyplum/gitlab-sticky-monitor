@@ -1,5 +1,6 @@
 import { useState, type KeyboardEvent } from "react";
 import { NOTE_COLORS } from "../constants";
+import { Icon } from "./Icon";
 
 export interface NoteFilterState {
   show_issues: boolean;
@@ -80,20 +81,24 @@ export function NoteSettingsPanel({
     <div className="note-settings-overlay">
       <div className="note-settings-card">
         <div className="note-settings-header">
-          <span className="note-settings-title">⚙️ 便笺设置与过滤</span>
+          <span className="note-settings-title">
+            <Icon name="settings" />
+            便笺设置
+          </span>
           <button
             className="note-btn close-btn"
             onClick={onClose}
             title="关闭设置"
+            aria-label="关闭设置"
           >
-            ✕
+            <Icon name="close" />
           </button>
         </div>
 
         <div className="note-settings-body">
           {/* Color Selection */}
           <div className="settings-field">
-            <label className="settings-label">便笺配色</label>
+            <span className="settings-label">便笺配色</span>
             <div className="settings-colors">
               {NOTE_COLORS.map((c) => (
                 <button
@@ -102,6 +107,10 @@ export function NoteSettingsPanel({
                   style={{ backgroundColor: c.value }}
                   onClick={() => onChangeColor(c.value)}
                   title={c.name}
+                  aria-label={c.name}
+                  aria-pressed={
+                    currentColor.toUpperCase() === c.value.toUpperCase()
+                  }
                 />
               ))}
             </div>
@@ -109,7 +118,7 @@ export function NoteSettingsPanel({
 
           {/* Only assigned to me */}
           <div className="settings-field">
-            <label className="settings-label">内容筛选</label>
+            <span className="settings-label">内容筛选</span>
             <label className="toggle-row">
               <input
                 type="checkbox"
@@ -122,7 +131,7 @@ export function NoteSettingsPanel({
 
           {/* Module Visibility */}
           <div className="settings-field">
-            <label className="settings-label">展示模块</label>
+            <span className="settings-label">展示模块</span>
             <div className="checkbox-group">
               <label className="checkbox-row">
                 <input
@@ -145,9 +154,12 @@ export function NoteSettingsPanel({
 
           {/* Label Filter */}
           <div className="settings-field">
-            <label className="settings-label">标签（Labels）过滤</label>
+            <label className="settings-label" htmlFor="note-label">
+              标签过滤
+            </label>
             <div className="label-input-box">
               <input
+                id="note-label"
                 type="text"
                 placeholder="输入标签名按 Enter 添加..."
                 value={labelInput}
@@ -156,7 +168,7 @@ export function NoteSettingsPanel({
               />
               <button
                 type="button"
-                className="btn-add-label"
+                className="btn btn-small"
                 onClick={handleAddLabel}
               >
                 添加
@@ -171,8 +183,9 @@ export function NoteSettingsPanel({
                       type="button"
                       onClick={() => handleRemoveLabel(lbl)}
                       title="移除标签"
+                      aria-label={`移除标签 ${lbl}`}
                     >
-                      ×
+                      <Icon name="close" />
                     </button>
                   </span>
                 ))}
@@ -187,7 +200,7 @@ export function NoteSettingsPanel({
         </div>
 
         <div className="note-settings-footer">
-          <button className="btn-confirm" onClick={onClose}>
+          <button className="btn btn-primary btn-small" onClick={onClose}>
             完成
           </button>
         </div>
