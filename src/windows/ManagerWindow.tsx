@@ -39,7 +39,6 @@ export function ManagerWindow() {
   // Notes
   const [notes, setNotes] = useState<NoteConfig[]>([]);
   const [selectedColor, setSelectedColor] = useState(NOTE_COLORS[0].value);
-  const [selectedFeed, setSelectedFeed] = useState<NoteFeed>("issues");
   const [noteBusy, setNoteBusy] = useState(false);
   const [noteError, setNoteError] = useState("");
 
@@ -210,10 +209,10 @@ export function ManagerWindow() {
     }
   };
 
-  const handleCreateNote = async (repo: WatchedRepo) => {
+  const handleCreateNote = async (repo: WatchedRepo, feed: NoteFeed) => {
     setNoteBusy(true);
     try {
-      await api.createNote(repo.source_id, repo.project_id, selectedFeed, selectedColor);
+      await api.createNote(repo.source_id, repo.project_id, feed, selectedColor);
       await loadNotes();
       setNoteError("");
     } catch (e) {
@@ -535,12 +534,6 @@ export function ManagerWindow() {
                 )}
 
                 <div className="watched-repos">
-                  <div className="source-selector note-kind-selector">
-                    <label htmlFor="note-feed">新建 GitLab 便笺类型</label>
-                    <select id="note-feed" value={selectedFeed} onChange={event => setSelectedFeed(event.target.value as NoteFeed)}>
-                      {Object.entries(NOTE_FEEDS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
-                  </div>
                   <h3>
                     已监听的仓库{" "}
                     <span className="section-count">{watchedRepos.length}</span>
@@ -568,13 +561,18 @@ export function ManagerWindow() {
                           <small>{repo.path}</small>
                         </div>
                         <div className="repo-actions">
-                          <button
-                            className="btn btn-small btn-primary"
-                            onClick={() => handleCreateNote(repo)}
-                            disabled={noteBusy}
-                          >
-                            <Icon name="note" /> 创建便笺
-                          </button>
+                          {(Object.keys(NOTE_FEEDS) as NoteFeed[]).map((feed) => (
+                            <button
+                              key={feed}
+                              className="btn btn-small"
+                              title={`创建 ${NOTE_FEEDS[feed]} 便笺`}
+                              aria-label={`创建 ${NOTE_FEEDS[feed]} 便笺`}
+                              onClick={() => handleCreateNote(repo, feed)}
+                              disabled={noteBusy}
+                            >
+                              {NOTE_FEEDS[feed]}
+                            </button>
+                          ))}
                           <button
                             className="btn btn-small btn-danger"
                             onClick={() =>

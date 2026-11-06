@@ -69,6 +69,7 @@ gitlab-sticky-monitor/
 ## UNIQUE STYLES
 - The manager and notes use a light theme with a muted green accent. Shared colors, controls, focus states, and status badges are maintained in `src/styles/global.css`; use the shared `Icon` for line icons.
 - The manager keeps the three existing sections (sources, repositories, notes) in a sidebar; aggregated work and notification features are not implemented by this UI refresh.
+- Each watched repository row exposes Issues, MR and Todos creation buttons directly; there is no separate global feed selector.
 - Sticky note styling lives in `src/styles/sticky-note.css`; the saved `--note-color` fills the note. Unfocused notes show content with a quiet drag region; native focus reveals controls and GitLab repository/source/data-update time.
 - Custom notes keep save status in the formatting toolbar. Mouse editing uses the caret without an enclosing focus ring; keyboard focus remains visible.
 
