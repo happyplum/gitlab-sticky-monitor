@@ -3,6 +3,11 @@
   "productName": "GitLab便笺监控",
   "version": "0.1.0",
   "identifier": "com.gitlab-sticky-monitor.app",
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg1RkU1REZEODM4MzVGQTYKUldTbVg0T00vVjMraFY1Tk9lb1o4UTYyYmpJWGx1c2tYOWN2M3NDY2d3MFBVVTJJcm5Nb0NwWmUK"
+    }
+  },
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -27,7 +32,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "targets": [
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

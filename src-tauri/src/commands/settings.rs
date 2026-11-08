@@ -1,12 +1,14 @@
 use crate::gitlab::client::GitLabClient;
 use crate::gitlab::types::GitLabUser;
-use crate::storage::{self, GitLabSource, WatchedRepo};
+use crate::storage::{self, AppUpdatesConfig, GitLabSource, WatchedRepo};
 use super::{get_config, reload_clients};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct SettingsResponse {
     pub sources: Vec<GitLabSource>,
     pub polling_interval_secs: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app_updates: Option<AppUpdatesConfig>,
 }
 
 #[tauri::command]
@@ -15,6 +17,7 @@ pub async fn get_settings() -> Result<SettingsResponse, String> {
     Ok(SettingsResponse {
         sources: cfg.sources.clone(),
         polling_interval_secs: cfg.polling_interval_secs,
+        app_updates: cfg.app_updates.clone(),
     })
 }
 
@@ -78,10 +81,12 @@ pub async fn test_source_connection(base_url: String, token: String) -> Result<G
 #[tauri::command]
 pub async fn save_settings(
     polling_interval_secs: Option<u64>,
+    app_updates: Option<AppUpdatesConfig>,
 ) -> Result<(), String> {
     let mut cfg = get_config().write().await;
     storage::update_config(&mut cfg, |cfg| {
-        if let Some(p) = polling_interval_secs { cfg.polling_interval_secs = p; }
+        if let Some(interval) = polling_interval_secs { cfg.polling_interval_secs = interval; }
+        if let Some(updates) = app_updates { cfg.app_updates = Some(updates); }
         Ok(())
     })
 }

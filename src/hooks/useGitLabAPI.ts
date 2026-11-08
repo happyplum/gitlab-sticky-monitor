@@ -7,10 +7,32 @@ import type {
   Todo,
   WatchedRepo,
   SettingsResponse,
+  AppUpdatesConfig,
   GitLabSource,
   NoteConfig,
   NoteFeed,
 } from "../types/gitlab";
+
+export interface UpdaterCheckResult {
+  available: boolean;
+  version?: string;
+  notes?: string;
+  currentVersion: string;
+}
+
+export interface UpdaterProgress {
+  stage:
+    | "checking"
+    | "available"
+    | "downloading"
+    | "installing"
+    | "up-to-date"
+    | "error"
+    | "idle";
+  version?: string;
+  progressPercent?: number;
+  message?: string;
+}
 
 export function useGitLabAPI() {
   const getSources = async () => {
@@ -104,10 +126,32 @@ export function useGitLabAPI() {
     return invoke<SettingsResponse>("get_settings");
   };
 
-  const saveSettings = async (pollingIntervalSecs?: number) => {
+  const saveSettings = async (
+    pollingIntervalSecs?: number,
+    appUpdates?: AppUpdatesConfig | null,
+  ) => {
     return invoke("save_settings", {
       pollingIntervalSecs: pollingIntervalSecs ?? null,
+      appUpdates: appUpdates ?? null,
     });
+  };
+
+  const updaterCheck = async (endpoint: string, token: string | null) => {
+    return invoke<UpdaterCheckResult>("updater_check", { endpoint, token });
+  };
+
+  const updaterDownloadAndInstall = async (
+    endpoint: string,
+    token: string | null,
+  ) => {
+    return invoke<{ started: true }>("updater_download_and_install", {
+      endpoint,
+      token,
+    });
+  };
+
+  const updaterCurrentVersion = async () => {
+    return invoke<{ currentVersion: string; defaultEndpoint: string }>("updater_current_version");
   };
 
   const getWatchedRepos = async () => {
@@ -169,6 +213,9 @@ export function useGitLabAPI() {
     addComment,
     getSettings,
     saveSettings,
+    updaterCheck,
+    updaterDownloadAndInstall,
+    updaterCurrentVersion,
     getWatchedRepos,
     addWatchedRepo,
     removeWatchedRepo,

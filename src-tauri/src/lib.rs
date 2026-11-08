@@ -3,6 +3,7 @@ mod gitlab;
 mod storage;
 mod tray;
 mod lifecycle;
+mod updater;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -12,6 +13,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             commands::init_config().map_err(std::io::Error::other)?;
             // Setup system tray
@@ -22,6 +24,14 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = commands::init_polling(app_handle).await {
                     log::error!("Failed to init polling: {}", e);
+                }
+            });
+
+            // 自动检查更新：auto_check 默认开启；仅发事件供 UI 提示，不自动下载。
+            let auto_check_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = updater::startup_auto_check(auto_check_handle).await {
+                    log::warn!("Startup update check failed: {}", e);
                 }
             });
 
@@ -69,6 +79,9 @@ pub fn run() {
             commands::settings::get_watched_repos,
             commands::settings::add_watched_repo,
             commands::settings::remove_watched_repo,
+            commands::updater_check,
+            commands::updater_download_and_install,
+            commands::updater_current_version,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

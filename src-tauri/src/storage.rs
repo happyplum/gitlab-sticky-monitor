@@ -21,6 +21,46 @@ pub struct AppConfig {
     pub notes: Vec<NoteConfig>,
     #[serde(default)]
     pub watched_repos: Vec<WatchedRepo>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app_updates: Option<AppUpdatesConfig>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AppUpdatesConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endpoint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_check: Option<bool>,
+}
+
+/// 默认更新源：公开 release 仓固定 stable tag 的 latest.json（Gitea 无 latest 重定向）。
+/// 权威源在此，前端经 updater_current_version 获取，不另存副本。
+pub const DEFAULT_UPDATE_ENDPOINT: &str =
+    "https://s.happyplum.cn:8888/tools/gitlab-sticky-monitor-releases/releases/download/stable/latest.json";
+
+impl AppUpdatesConfig {
+    pub fn effective_endpoint(&self) -> String {
+        self.endpoint
+            .as_deref()
+            .map(str::trim)
+            .filter(|endpoint| !endpoint.is_empty())
+            .map(str::to_string)
+            .unwrap_or_else(|| DEFAULT_UPDATE_ENDPOINT.to_string())
+    }
+
+    pub fn effective_token(&self) -> Option<String> {
+        self.token
+            .as_deref()
+            .map(str::trim)
+            .filter(|token| !token.is_empty())
+            .map(str::to_string)
+    }
+
+    pub fn auto_check_enabled(&self) -> bool {
+        self.auto_check.unwrap_or(true)
+    }
 }
 
 fn default_polling_interval() -> u64 {
@@ -103,6 +143,7 @@ impl Default for AppConfig {
             polling_interval_secs: 300,
             notes: Vec::new(),
             watched_repos: Vec::new(),
+            app_updates: None,
         }
     }
 }
@@ -382,6 +423,33 @@ mod tests {
         assert!(save_to(&path, &next).is_err());
         assert_eq!(fs::read(&path).unwrap(), before);
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn app_updates_roundtrip_keeps_endpoint_token_and_auto_check() {
+        let config = AppConfig {
+            app_updates: Some(AppUpdatesConfig {
+                endpoint: Some("https://example.invalid/latest.json".into()),
+                token: Some("synthetic-test-token".into()),
+                auto_check: Some(false),
+            }),
+            ..AppConfig::default()
+        };
+        let encoded = serde_json::to_value(&config).unwrap();
+        let restored: AppConfig = serde_json::from_value(encoded.clone()).unwrap();
+        assert_eq!(serde_json::to_value(restored).unwrap(), encoded);
+        assert_eq!(encoded["app_updates"]["endpoint"], "https://example.invalid/latest.json");
+        assert_eq!(encoded["app_updates"]["token"], "synthetic-test-token");
+        assert_eq!(encoded["app_updates"]["auto_check"], false);
+    }
+
+    #[test]
+    fn legacy_config_without_app_updates_parses_to_none() {
+        let legacy = r#"{"version":2,"sources":[],"polling_interval_secs":300,"notes":[],"watched_repos":[]}"#;
+        let config: AppConfig = serde_json::from_str(legacy).unwrap();
+        assert_eq!(config.version, 2);
+        assert!(config.app_updates.is_none());
+        assert!(serde_json::to_value(AppConfig::default()).unwrap().get("app_updates").is_none());
     }
 
     #[test]

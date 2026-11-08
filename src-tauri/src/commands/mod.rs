@@ -2,6 +2,14 @@ pub mod gitlab;
 pub mod notes;
 pub mod settings;
 
+// `generate_handler!` looks up `__cmd__*` next to the path in lib.rs (`commands::…`).
+pub use crate::updater::{
+    __cmd__updater_check, __cmd__updater_current_version, __cmd__updater_download_and_install,
+    __tauri_command_name_updater_check, __tauri_command_name_updater_current_version,
+    __tauri_command_name_updater_download_and_install, updater_check, updater_current_version,
+    updater_download_and_install,
+};
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::AppHandle;

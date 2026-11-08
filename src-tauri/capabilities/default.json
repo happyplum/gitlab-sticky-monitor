@@ -18,6 +18,7 @@
     "core:event:default",
     "opener:default",
     "notification:default",
-    "shell:default"
+    "shell:default",
+    "updater:default"
   ]
 }

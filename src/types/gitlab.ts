@@ -128,8 +128,15 @@ export interface GitLabUpdate {
   timestamp: string;
 }
 
+export interface AppUpdatesConfig {
+  endpoint?: string;
+  token?: string;
+  auto_check?: boolean;
+}
+
 export interface SettingsResponse {
   sources: GitLabSource[];
   polling_interval_secs: number;
+  app_updates?: AppUpdatesConfig | null;
 }
 

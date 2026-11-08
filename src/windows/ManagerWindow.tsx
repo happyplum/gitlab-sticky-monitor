@@ -1,17 +1,30 @@
 import { useEffect, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useGitLabAPI } from "../hooks/useGitLabAPI";
 import { Icon } from "../components/Icon";
 import type {
+  AppUpdatesConfig,
   GitLabSource,
   Project,
   WatchedRepo,
   NoteConfig,
   NoteFeed,
 } from "../types/gitlab";
+import type { UpdaterProgress } from "../hooks/useGitLabAPI";
 import "../styles/global.css";
 
 import { NOTE_COLORS, NOTE_FEEDS } from "../constants";
+
+// 默认更新源以 Rust storage::DEFAULT_UPDATE_ENDPOINT 为权威源，经 updater_current_version 下发。
+const DEFAULT_UPDATE_ENDPOINT_FALLBACK =
+  "https://s.happyplum.cn:8888/tools/gitlab-sticky-monitor-releases/releases/download/stable/latest.json";
+
+type UpdateCheckState =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "available"; version?: string; notes?: string }
+  | { kind: "current" }
+  | { kind: "error"; message: string };
 
 export function ManagerWindow() {
   const api = useGitLabAPI();
@@ -46,6 +59,15 @@ export function ManagerWindow() {
     "settings" | "repos" | "notes"
   >("settings");
 
+  const [currentVersion, setCurrentVersion] = useState("");
+  const [defaultEndpoint, setDefaultEndpoint] = useState("");
+  const [updateEndpoint, setUpdateEndpoint] = useState("");
+  const [updateToken, setUpdateToken] = useState("");
+  const [autoCheck, setAutoCheck] = useState(true);
+  const [updateCheck, setUpdateCheck] = useState<UpdateCheckState>({ kind: "idle" });
+  const [updateProgress, setUpdateProgress] = useState<UpdaterProgress>({ stage: "idle" });
+  const [savingUpdates, setSavingUpdates] = useState(false);
+
   // Load initial data
   useEffect(() => {
     loadSources();
@@ -59,11 +81,39 @@ export function ManagerWindow() {
     return () => { events.forEach(event => { void event.then(unlisten => unlisten()); }); };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    let unlisten: UnlistenFn | undefined;
+    void api.updaterCurrentVersion().then(
+      (result) => {
+        if (!active) return;
+        setCurrentVersion(result.currentVersion);
+        setDefaultEndpoint(result.defaultEndpoint);
+        setUpdateEndpoint((current) => current || result.defaultEndpoint);
+      },
+      () => { if (active) setCurrentVersion("未知"); },
+    );
+    const subscription = listen<UpdaterProgress>("updater-progress", ({ payload }) => {
+      setUpdateProgress(payload);
+    });
+    void subscription.then((stop) => {
+      if (active) unlisten = stop;
+      else stop();
+    });
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, []);
+
   const loadSources = async () => {
     try {
       const s = await api.getSettings();
       setSources(s.sources);
       setPollingInterval(s.polling_interval_secs);
+      setUpdateEndpoint(s.app_updates?.endpoint?.trim() || defaultEndpoint || DEFAULT_UPDATE_ENDPOINT_FALLBACK);
+      setUpdateToken(s.app_updates?.token ?? "");
+      setAutoCheck(s.app_updates?.auto_check ?? true);
       if (s.sources.length > 0 && !activeSourceId) {
         setActiveSourceId(s.sources[0].id);
       }
@@ -163,6 +213,46 @@ export function ManagerWindow() {
       alert("轮询间隔设置已保存！");
     } catch (e) {
       alert(String(e));
+    }
+  };
+
+  const handleCheckUpdate = async () => {
+    setUpdateCheck({ kind: "checking" });
+    setUpdateProgress({ stage: "idle" });
+    try {
+      const result = await api.updaterCheck(updateEndpoint.trim(), updateToken.trim() || null);
+      setCurrentVersion(result.currentVersion);
+      setUpdateCheck(result.available
+        ? { kind: "available", version: result.version, notes: result.notes }
+        : { kind: "current" });
+    } catch (error) {
+      setUpdateCheck({ kind: "error", message: String(error) });
+    }
+  };
+
+  const handleDownloadUpdate = async () => {
+    setUpdateProgress({ stage: "downloading", progressPercent: 0 });
+    try {
+      await api.updaterDownloadAndInstall(updateEndpoint.trim(), updateToken.trim() || null);
+    } catch (error) {
+      setUpdateProgress({ stage: "error", message: String(error) });
+    }
+  };
+
+  const handleSaveUpdates = async () => {
+    const endpoint = updateEndpoint.trim();
+    const token = updateToken.trim();
+    const appUpdates: AppUpdatesConfig = { auto_check: autoCheck };
+    if (endpoint) appUpdates.endpoint = endpoint;
+    if (token) appUpdates.token = token;
+    setSavingUpdates(true);
+    try {
+      await api.saveSettings(undefined, appUpdates);
+      alert("应用更新设置已保存！");
+    } catch (error) {
+      alert(String(error));
+    } finally {
+      setSavingUpdates(false);
     }
   };
 
@@ -446,6 +536,105 @@ export function ManagerWindow() {
               </div>
               <button className="btn btn-primary" onClick={handleSaveInterval}>
                 保存轮询间隔
+              </button>
+            </div>
+
+            <div className="settings-section">
+              <h3>应用更新</h3>
+              <div className="form-group">
+                <span className="field-label">当前版本</span>
+                <strong>{currentVersion || "读取中..."}</strong>
+              </div>
+              <div className="action-row">
+                <button
+                  className="btn"
+                  onClick={() => void handleCheckUpdate()}
+                  disabled={updateCheck.kind === "checking"}
+                >
+                  {updateCheck.kind === "checking" ? "检查中..." : "检查更新"}
+                </button>
+              </div>
+              {updateCheck.kind === "available" && (
+                <div className="success-msg" role="status">
+                  <Icon name="check" />
+                  <div>
+                    <div>新版本 {updateCheck.version}</div>
+                    {updateCheck.notes && <small>{updateCheck.notes}</small>}
+                  </div>
+                </div>
+              )}
+              {updateCheck.kind === "available" && (
+                <div className="action-row">
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => void handleDownloadUpdate()}
+                    disabled={updateProgress.stage === "downloading" || updateProgress.stage === "installing"}
+                  >
+                    下载并安装
+                  </button>
+                </div>
+              )}
+              {updateCheck.kind === "current" && (
+                <div className="success-msg" role="status">
+                  <Icon name="check" />
+                  已是最新
+                </div>
+              )}
+              {updateCheck.kind === "error" && (
+                <div className="error-msg" role="alert">
+                  <Icon name="issue" />
+                  {updateCheck.message}
+                </div>
+              )}
+              {updateProgress.stage === "downloading" && (
+                <div className="success-msg" role="status">
+                  下载中 {updateProgress.progressPercent ?? 0}%
+                </div>
+              )}
+              {updateProgress.stage === "installing" && (
+                <div className="success-msg" role="status">
+                  正在安装，即将重启
+                </div>
+              )}
+              {updateProgress.stage === "error" && (
+                <div className="error-msg" role="alert">
+                  <Icon name="issue" />
+                  {updateProgress.message || "更新失败"}
+                </div>
+              )}
+              <div className="form-group">
+                <label htmlFor="update-endpoint">更新源地址</label>
+                <input
+                  id="update-endpoint"
+                  type="text"
+                  value={updateEndpoint}
+                  onChange={(e) => setUpdateEndpoint(e.target.value)}
+                          placeholder={defaultEndpoint || DEFAULT_UPDATE_ENDPOINT_FALLBACK}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="update-token">访问令牌（可选）</label>
+                <input
+                  id="update-token"
+                  type="password"
+                  value={updateToken}
+                  onChange={(e) => setUpdateToken(e.target.value)}
+                  placeholder="公开源可留空"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="update-auto-check">
+                  <input
+                    id="update-auto-check"
+                    type="checkbox"
+                    checked={autoCheck}
+                    onChange={(e) => setAutoCheck(e.target.checked)}
+                  />{" "}
+                  自动检查更新
+                </label>
+              </div>
+              <button className="btn btn-primary" onClick={() => void handleSaveUpdates()} disabled={savingUpdates}>
+                {savingUpdates ? "保存中..." : "保存"}
               </button>
             </div>
           </section>
