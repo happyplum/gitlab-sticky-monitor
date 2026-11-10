@@ -11,7 +11,7 @@ GitLab Sticky Monitor is a desktop sticky note utility for GitLab issues, merge 
 ```
 gitlab-sticky-monitor/
 ├── src/                    # Frontend React application (single-bundle multi-window dispatch)
-│   ├── components/         # Cards, NoteSettingsPanel, shared Icon and StatusBadge
+│   ├── components/         # Title-only cards, NoteSettingsPanel, shared Icon and RichTextEditor
 │   ├── hooks/              # useGitLabAPI hook wrapping Tauri invoke calls
 │   ├── windows/            # ManagerWindow (settings & repo manager) & StickyNote (desktop card)
 │   ├── styles/             # global.css (theme variables) & sticky-note.css (note layout)
@@ -67,11 +67,12 @@ gitlab-sticky-monitor/
 - Do NOT query repositories without specifying `source_id`; cross-source collisions will occur.
 
 ## UNIQUE STYLES
-- The manager and notes use a light theme with a muted green accent. Shared colors, controls, focus states, and status badges are maintained in `src/styles/global.css`; use the shared `Icon` for line icons.
+- The manager and notes use a light theme with a muted green accent. Shared colors, controls and focus states are maintained in `src/styles/global.css`; use the shared `Icon` for line icons.
 - The manager keeps the three existing sections (sources, repositories, notes) in a sidebar; aggregated work and notification features are not implemented by this UI refresh.
 - Each watched repository row exposes Issues, MR and Todos creation buttons directly; there is no separate global feed selector.
-- Sticky note styling lives in `src/styles/sticky-note.css`; the saved `--note-color` fills the note. Unfocused notes show content with a quiet drag region; native focus reveals controls and GitLab repository/source/data-update time.
-- Custom notes keep save status in the formatting toolbar. Mouse editing uses the caret without an enclosing focus ring; keyboard focus remains visible.
+- Sticky note styling lives in `src/styles/sticky-note.css`; the saved `--note-color` fills the note. The 36px header always shows type/repository; GitLab notes reserve a 32px footer for source and the single shared sync time. Tools reveal on hover or focus within, retaining their space and keyboard access. Focus must not change item geometry, content viewport height or scroll position.
+- GitLab rows show only `!iid title` (MR), `#iid title` (Issue), or Todo body. Titles wrap fully; no repeated type icons or per-item metadata. Draft MRs retain an existing `Draft:` prefix, otherwise receive a single 草稿 marker. Filtering, order and the 15-item limit are independent of presentation.
+- Custom notes reserve a 39px formatting toolbar including save status, even when tools are hidden. Mouse editing uses the caret without an enclosing focus ring; keyboard focus remains visible.
 
 ## NOTE DATA AND LIFECYCLE
 - `NoteConfig` shares ID, color, geometry, pinning and `is_open`. Its `kind` discriminates `gitlab` (one `feed`: issues/mrs/todos, source/repo and filters) from `custom` (Lexical document JSON). No duplicate HTML/plain-text content is stored.
@@ -110,6 +111,8 @@ node scripts/publish-release.mjs --api-base https://s.happyplum.cn:8888 --owner 
 The updater feed is the fixed `stable` tag attachment URL (`.../releases/download/stable/latest.json`); Gitea has no `/releases/latest/download` redirect. The Gitea instance runs with REQUIRE_SIGNIN_VIEW, so the in-app update check sends the optional token from settings as `Authorization: token <t>`.
 
 `tests/noteLifecycle.html` mounts the actual note UI with controlled mock IPC for close/exit/resize races. With `npm run dev` running, use an isolated Playwright CLI session to open `http://localhost:1420/tests/noteLifecycle.html`, then run `tests/noteLifecycle.browser.js` and inspect `window.__raceResult.passed`. This checks component ordering, not native OS exit or real GitLab connectivity.
+
+`tests/noteLayout.html` mounts the same note UI with synthetic GitLab/custom fixtures and mock IPC. With the dev server running, execute `playwright-cli -s=note-layout open http://localhost:1420/tests/noteLayout.html`, then `playwright-cli -s=note-layout run-code --filename=tests/noteLayout.browser.js`. Inspect the returned `passed` and `window.__layoutResult.passed` (CLI exit code alone is insufficient). It covers stable focus/hover geometry, click targets, title-only rows, long/draft titles, empty states, keyboard tools, and custom editing/save/close at 340px and 200px widths. Native activation, dragging and resizing require separate isolated desktop checks.
 
 ## PROJECT MANAGEMENT
 - Issues, pull requests, milestones, labels and Actions are managed with `gt`, the Gitea CLI (installed at `C:/Users/lzy/.local/bin/gt.exe`).

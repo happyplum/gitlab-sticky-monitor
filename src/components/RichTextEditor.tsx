@@ -18,7 +18,7 @@ const formats: { value: TextFormatType; label: string; text: string }[] = [
   { value: "strikethrough", label: "删除线", text: "S" },
 ];
 
-function Toolbar({ visible, disabled, status }: { visible: boolean; disabled: boolean; status: ReactNode }) {
+function Toolbar({ disabled, status }: { disabled: boolean; status: ReactNode }) {
   const [editor] = useLexicalComposerContext();
   const [active, setActive] = useState<TextFormatType[]>([]);
   useEffect(() => editor.registerUpdateListener(({ editorState }) => {
@@ -31,7 +31,7 @@ function Toolbar({ visible, disabled, status }: { visible: boolean; disabled: bo
   }), [editor]);
   useEffect(() => { editor.setEditable(!disabled); }, [editor, disabled]);
 
-  return <div className="editor-toolbar" role="toolbar" aria-label="文字格式" hidden={!visible}>
+  return <div className="editor-toolbar note-tools" role="toolbar" aria-label="文字格式">
     {formats.map(({ value, label, text }) => <button
       key={value} type="button" className={`note-btn format-${value}`}
       aria-label={label} title={label} aria-pressed={active.includes(value)} disabled={disabled}
@@ -44,13 +44,12 @@ function Toolbar({ visible, disabled, status }: { visible: boolean; disabled: bo
     <button type="button" className="note-btn" aria-label="减少缩进" title="减少缩进" disabled={disabled}
       onMouseDown={(event) => event.preventDefault()}
       onClick={() => { editor.dispatchCommand(OUTDENT_CONTENT_COMMAND, undefined); editor.focus(); }}>←</button>
-    <span className="editor-status" role="status">{status}</span>
+    <span className="editor-status" role="status" title={typeof status === "string" ? status : undefined}>{status}</span>
   </div>;
 }
 
-export function RichTextEditor({ initialDocument, focused, disabled, status, onChange, onError }: {
+export function RichTextEditor({ initialDocument, disabled, status, onChange, onError }: {
   initialDocument: SerializedEditorState;
-  focused: boolean;
   disabled: boolean;
   status: ReactNode;
   onChange: (document: SerializedEditorState) => void;
@@ -76,7 +75,7 @@ export function RichTextEditor({ initialDocument, focused, disabled, status, onC
         data-pointer-focus={pointerFocus} onPointerDown={() => setPointerFocus(true)} onBlur={() => setPointerFocus(false)}
         placeholder={<span className="editor-placeholder">写点什么…</span>} />
     </div>
-    <Toolbar visible={focused} disabled={disabled} status={status} />
+    <Toolbar disabled={disabled} status={status} />
     <OnChangePlugin ignoreSelectionChange ignoreHistoryMergeTagChange={false}
       onChange={(state) => onChange(state.toJSON())} />
   </LexicalExtensionComposer>;

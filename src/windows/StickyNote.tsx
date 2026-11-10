@@ -120,14 +120,14 @@ function NoteWindow({ initialNote }: { initialNote: NoteConfig }) {
       setError("");
     } catch (error) { setError(String(error)); }
   }
-  const title = note.kind === "custom" ? "自定义便笺" : NOTE_FEEDS[note.feed];
+  const title = note.kind === "custom" ? "自定义便笺" : `${NOTE_FEEDS[note.feed]} · ${note.repo_name}`;
   const changeFilters = (filters: NoteFilters) => { void update({ onlyAssignedToMe: filters.only_assigned_to_me, labels: filters.labels }); };
 
   return <div className={`sticky-note ${focused ? "is-focused" : ""}`} style={{ "--note-color": note.color } as CSSProperties}
     onPointerDown={() => setFocused(true)} onFocusCapture={() => setFocused(true)}>
     <div className="note-header" data-tauri-drag-region>
-      <span className="note-title" data-tauri-drag-region>{focused ? title : ""}</span>
-      <div className="note-controls" style={{ visibility: focused ? "visible" : "hidden" }}>
+      <span className="note-title" title={title} data-tauri-drag-region>{title}</span>
+      <div className="note-controls note-tools">
         <button className="note-btn" aria-label="便笺设置" title="便笺设置" disabled={busy} onClick={() => setShowSettings(true)}><Icon name="settings" /></button>
         <button className={`note-btn ${note.always_on_top ? "active" : ""}`} aria-label={note.always_on_top ? "取消置顶" : "置顶"}
           aria-pressed={note.always_on_top} title={note.always_on_top ? "取消置顶" : "置顶"} disabled={busy}
@@ -136,19 +136,19 @@ function NoteWindow({ initialNote }: { initialNote: NoteConfig }) {
       </div>
     </div>
     {note.kind === "custom"
-      ? <RichTextEditor initialDocument={note.document} focused={focused} disabled={busy || editorFailed.current}
+      ? <RichTextEditor initialDocument={note.document} disabled={busy || editorFailed.current}
           status={busy ? "正在保存…" : saveStatus.state === "saving" ? "保存中…" : saveStatus.state === "error" ? "尚未保存" : "已保存"}
           onChange={document => { if (!editorFailed.current) draft.set(document); }}
           onError={error => { editorFailed.current = true; setError(error.message); }} />
-      : <GitLabContents note={note} focused={focused} refresh={refresh} onUpdated={setUpdated} />}
+      : <GitLabContents note={note} refresh={refresh} onUpdated={setUpdated} />}
     {(error || saveStatus.state === "error") && <div className="note-error" role="alert">
       <span>{error || `尚未保存：${saveStatus.error}`}</span>
       {!editorFailed.current && <button className="btn btn-small" disabled={busy} onClick={() => { void flush().then(() => setError("")).catch(error => setError(String(error))); }}>重试保存</button>}
     </div>}
-    {note.kind === "gitlab" && <div className="note-footer" hidden={!focused}>
-        <div className="note-context"><strong title={note.repo_name}>{note.repo_name}</strong><span title={sourceName}>{sourceName}</span>
-          <span>{updated ? `更新于 ${new Date(updated).toLocaleTimeString()}` : "尚未同步"}</span></div>
-        <button className="note-btn" aria-label="刷新" title="刷新" disabled={busy} onClick={() => setRefresh(value => value + 1)}><Icon name="refresh" /></button>
+    {note.kind === "gitlab" && <div className="note-footer">
+        <div className="note-context"><span className="note-source" title={sourceName}>{sourceName}</span>
+          <span className="note-updated">{updated ? `更新于 ${new Date(updated).toLocaleTimeString()}` : "尚未同步"}</span></div>
+        <button className="note-btn note-tools" aria-label="刷新" title="刷新" disabled={busy} onClick={() => setRefresh(value => value + 1)}><Icon name="refresh" /></button>
     </div>}
     {showSettings && focused && <NoteSettingsPanel currentColor={note.color}
       filters={note.kind === "gitlab" && note.feed !== "todos" ? note.filters : undefined}
@@ -157,9 +157,8 @@ function NoteWindow({ initialNote }: { initialNote: NoteConfig }) {
   </div>;
 }
 
-function GitLabContents({ note, focused, refresh, onUpdated }: {
+function GitLabContents({ note, refresh, onUpdated }: {
   note: Extract<NoteConfig, { kind: "gitlab" }>;
-  focused: boolean;
   refresh: number;
   onUpdated: (time: string) => void;
 }) {
@@ -222,14 +221,14 @@ function GitLabContents({ note, focused, refresh, onUpdated }: {
   };
   const issues = data.issues.filter(matches), mrs = data.mrs.filter(matches);
   const count = feed === "issues" ? issues.length : feed === "mrs" ? mrs.length : data.todos.length;
-  return <div className={`note-content ${focused ? "details-visible" : ""}`}>
+  return <div className="note-content">
     {error && <div className="note-error" role="alert">{error}</div>}
     {loading ? <div className="loading" role="status">加载中…</div> : count === 0
       ? <div className="empty">暂无符合条件的{NOTE_FEEDS[feed]}</div>
       : feed === "issues" ? issues.slice(0, 15).map(issue => <IssueCard key={issue.id} issue={issue} />)
       : feed === "mrs" ? mrs.slice(0, 15).map(mr => <MergeRequestCard key={mr.id} mr={mr} />)
       : data.todos.slice(0, 15).map(todo => <button type="button" key={todo.id} className="todo-item" onClick={() => void openUrl(todo.target_url)}>
-          <span className="todo-body">{todo.body}</span><span className="todo-action">{todo.action_name}</span>
+          <span className="todo-body">{todo.body}</span>
         </button>)}
   </div>;
 }

@@ -2,6 +2,8 @@
 
 桌面 GitLab 便笺工具：监听 Issue / Merge Request / Todo，以桌面便笺形式常驻。基于 Tauri v2（Rust）+ React 19 + TypeScript。
 
+便笺中的 MR / Issue 只显示编号和完整标题，长标题自然换行；Todo 只显示正文。点击条目直接打开 GitLab。仓库显示在顶栏，来源和统一同步时间显示在底栏。设置、置顶、收起、刷新和文字格式工具在鼠标移入或键盘聚焦时显示，始终保留位置，聚焦不会展开列表或挤压正文。
+
 ## 开发
 
 ```bash
