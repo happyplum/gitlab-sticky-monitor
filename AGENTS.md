@@ -111,6 +111,13 @@ The updater feed is the fixed `stable` tag attachment URL (`.../releases/downloa
 
 `tests/noteLifecycle.html` mounts the actual note UI with controlled mock IPC for close/exit/resize races. With `npm run dev` running, use an isolated Playwright CLI session to open `http://localhost:1420/tests/noteLifecycle.html`, then run `tests/noteLifecycle.browser.js` and inspect `window.__raceResult.passed`. This checks component ordering, not native OS exit or real GitLab connectivity.
 
+## PROJECT MANAGEMENT
+- Issues, pull requests, milestones, labels and Actions are managed with `gt`, the Gitea CLI (installed at `C:/Users/lzy/.local/bin/gt.exe`).
+- gt is authenticated against `https://s.happyplum.cn:8888` (account `happyplum`, OAuth token in the system keyring).
+- This checkout's git `origin` points to GitHub, so gt repository auto-discovery fails here (`gt doctor` flags it); pass the repository explicitly per command, e.g. `gt issue list -R OWNER/REPO`.
+- gt commands that read issues or organizations require matching OAuth scopes; on a scope error re-login with e.g. `gt auth login --host https://s.happyplum.cn:8888 --oauth --scopes read:issue`.
+- The Gitea instance requires sign-in (`REQUIRE_SIGNIN_VIEW`); use `gt api` for authenticated raw API calls. Release publishing stays on `scripts/publish-release.mjs` with a PAT (see Release build and publishing).
+
 ## NOTES
 - Multiple self-hosted and cloud GitLab instances can be configured in parallel via `sources` settings.
 - Saved configuration lives in OS config directory (`%APPDATA%/gitlab-sticky-monitor/config.json` on Windows). Debug builds accept `GITLAB_STICKY_TEST_CONFIG` for isolated desktop acceptance; production ignores it.
