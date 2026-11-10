@@ -709,7 +709,7 @@ export function ManagerWindow() {
                             )}
                           </div>
                           <button
-                            className="btn btn-small"
+                            className={`btn btn-small ${isWatched ? "is-watched" : ""}`}
                             onClick={() => handleAddRepo(project)}
                             disabled={isWatched}
                           >
@@ -805,7 +805,7 @@ export function ManagerWindow() {
                     title={c.name}
                     aria-label={c.name}
                     aria-pressed={selectedColor === c.value}
-                  />
+                  >{selectedColor === c.value && <Icon name="check" />}</button>
                 ))}
               </div>
             </div>

@@ -129,7 +129,7 @@ function NoteWindow({ initialNote }: { initialNote: NoteConfig }) {
       <span className="note-title" title={title} data-tauri-drag-region>{title}</span>
       <div className="note-controls note-tools">
         <button className="note-btn" aria-label="便笺设置" title="便笺设置" disabled={busy} onClick={() => setShowSettings(true)}><Icon name="settings" /></button>
-        <button className={`note-btn ${note.always_on_top ? "active" : ""}`} aria-label={note.always_on_top ? "取消置顶" : "置顶"}
+        <button className={`note-btn ${note.always_on_top ? "active" : ""}`} aria-label="置顶便笺"
           aria-pressed={note.always_on_top} title={note.always_on_top ? "取消置顶" : "置顶"} disabled={busy}
           onClick={() => void update({ alwaysOnTop: !note.always_on_top })}><Icon name="pin" /></button>
         <button className="note-btn close-btn" aria-label="收起便笺" title="收起便笺，内容会保留" disabled={busy} onClick={() => void close()}><Icon name="close" /></button>

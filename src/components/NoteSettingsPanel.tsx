@@ -90,7 +90,7 @@ export function NoteSettingsPanel({
                   aria-pressed={
                     currentColor.toUpperCase() === c.value.toUpperCase()
                   }
-                />
+                >{currentColor.toUpperCase() === c.value.toUpperCase() && <Icon name="check" />}</button>
               ))}
             </div>
           </div>

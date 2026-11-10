@@ -5,6 +5,7 @@ import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { HistoryExtension } from "@lexical/history";
 import { registerRichText } from "@lexical/rich-text";
+import { Icon } from "./Icon";
 import {
   $getSelection, $isRangeSelection, defineExtension,
   FORMAT_TEXT_COMMAND, INDENT_CONTENT_COMMAND, OUTDENT_CONTENT_COMMAND,
@@ -40,10 +41,10 @@ function Toolbar({ disabled, status }: { disabled: boolean; status: ReactNode })
     >{text}</button>)}
     <button type="button" className="note-btn" aria-label="增加缩进" title="增加缩进" disabled={disabled}
       onMouseDown={(event) => event.preventDefault()}
-      onClick={() => { editor.dispatchCommand(INDENT_CONTENT_COMMAND, undefined); editor.focus(); }}>→</button>
+      onClick={() => { editor.dispatchCommand(INDENT_CONTENT_COMMAND, undefined); editor.focus(); }}><Icon name="indent" /></button>
     <button type="button" className="note-btn" aria-label="减少缩进" title="减少缩进" disabled={disabled}
       onMouseDown={(event) => event.preventDefault()}
-      onClick={() => { editor.dispatchCommand(OUTDENT_CONTENT_COMMAND, undefined); editor.focus(); }}>←</button>
+      onClick={() => { editor.dispatchCommand(OUTDENT_CONTENT_COMMAND, undefined); editor.focus(); }}><Icon name="outdent" /></button>
     <span className="editor-status" role="status" title={typeof status === "string" ? status : undefined}>{status}</span>
   </div>;
 }

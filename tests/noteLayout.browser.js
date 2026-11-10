@@ -69,7 +69,7 @@ async page => {
   await page.keyboard.press('Enter');
   check('keyboard: settings opens', await page.locator('.note-settings-overlay').isVisible());
   await page.getByRole('button', { name: '关闭设置', exact: true }).click();
-  await page.getByRole('button', { name: '取消置顶', exact: true }).click();
+  await page.getByRole('button', { name: '置顶便笺', exact: true }).click();
   check('pin action preserved', await page.evaluate(() => !window.__layout.note.always_on_top));
   await page.getByRole('button', { name: '刷新', exact: true }).click();
   await page.waitForFunction(() => window.__layout.refreshes === 2);
