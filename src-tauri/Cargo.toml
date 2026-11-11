@@ -1,6 +1,6 @@
 [package]
 name = "gitlab-sticky-monitor"
-version = "0.1.1"
+version = "0.1.2"
 description = "A Tauri-based desktop sticky note tool for monitoring GitLab issues and merge requests"
 authors = ["you"]
 edition = "2021"
