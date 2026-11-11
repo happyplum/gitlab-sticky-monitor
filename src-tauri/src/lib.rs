@@ -5,11 +5,22 @@ mod tray;
 mod lifecycle;
 mod updater;
 
+use tauri::Manager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::init();
 
     tauri::Builder::default()
+        // 单实例插件必须最先注册(插件按注册顺序初始化);
+        // 已有实例运行时,二次启动进程把 argv 转交后立即退出,并在此回调唤起管理窗口。
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(window) = app.get_webview_window("manager") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_shell::init())
